@@ -1,4 +1,4 @@
-module github.com/b4fun/parsimonious
+module github.com/b4fun/parsimonious-go
 
 go 1.20
 

@@ -1,6 +1,8 @@
 # parsimonious-go
 
-Parsimonious Golang port
+[Parsimonious][parsimonious-py] Golang port
+
+[parsimonious-py]: https://github.com/erikrose/parsimonious
 
 ## TODO
 

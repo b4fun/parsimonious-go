@@ -7,11 +7,11 @@ import (
 
 type Node struct {
 	Expression Expression
-	Text string
-	Start int
-	End int
-	Children []*Node
-	Match string // for regex expression
+	Text       string
+	Start      int
+	End        int
+	Children   []*Node
+	Match      string // for regex expression
 }
 
 func (n *Node) String() string {
@@ -29,10 +29,10 @@ func newNode(
 ) *Node {
 	return &Node{
 		Expression: expression,
-		Text: fullText[start:end],
-		Start: start,
-		End: end,
-		Children: make([]*Node, 0),
+		Text:       fullText[start:end],
+		Start:      start,
+		End:        end,
+		Children:   make([]*Node, 0),
 	}
 }
 
@@ -69,13 +69,13 @@ type NodeVisitFunc func(v NodeVisitor, node *Node) (any, error)
 type NodeVisitWithChildrenFunc func(node *Node, children []any) (any, error)
 
 type NodeVisitorMux struct {
-	visitors map[string]NodeVisitFunc
+	visitors     map[string]NodeVisitFunc
 	defaultVisit NodeVisitFunc
 }
 
 func NewNodeVisitorMux(defaultVisit NodeVisitFunc) *NodeVisitorMux {
 	return &NodeVisitorMux{
-		visitors: make(map[string]NodeVisitFunc),
+		visitors:     make(map[string]NodeVisitFunc),
 		defaultVisit: defaultVisit,
 	}
 }
@@ -146,7 +146,7 @@ func DumpNodeExprTree(node *Node) string {
 		fmt.Fprintf(sb, "%s\n", node.Expression)
 
 		for _, child := range node.Children {
-			dump(child, indent + 2)
+			dump(child, indent+2)
 		}
 	}
 

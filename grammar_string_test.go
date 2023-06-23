@@ -4,33 +4,33 @@ import "testing"
 
 func Test_evalPythonStringValue(t *testing.T) {
 	cases := []struct {
-		name string
-		in   string
-		out string
+		name      string
+		in        string
+		out       string
 		expectErr bool
 	}{
 		{
-			name: "double quoted string",
-			in:  `"hello'world'"`,
-			out: "hello'world'",
+			name:      "double quoted string",
+			in:        `"hello'world'"`,
+			out:       "hello'world'",
 			expectErr: false,
 		},
 		{
-			name: "single quoted string",
-			in:  `'hello"world"'`,
-			out: "hello\"world\"",
+			name:      "single quoted string",
+			in:        `'hello"world"'`,
+			out:       "hello\"world\"",
 			expectErr: false,
 		},
 		{
-			name: "raw string + double quoted",
-			in:  `r"hello\'world'"`,
-			out: "hello\\'world'",
+			name:      "raw string + double quoted",
+			in:        `r"hello\'world'"`,
+			out:       "hello\\'world'",
 			expectErr: false,
 		},
 		{
-			name: "raw string + single quoted",
-			in:  `r'hello\"world"'`,
-			out: "hello\\\"world\"",
+			name:      "raw string + single quoted",
+			in:        `r'hello\"world"'`,
+			out:       "hello\\\"world\"",
 			expectErr: false,
 		},
 		// TODO: unicode support
@@ -41,9 +41,9 @@ func Test_evalPythonStringValue(t *testing.T) {
 		// 	expectErr: false,
 		// },
 		{
-			name: "regex",
-			in:  `r"or[@a-z][a-z_0-9\.\[\]\"'-]"`,
-			out: "or[@a-z][a-z_0-9\\.\\[\\]\\\"'-]",
+			name:      "regex",
+			in:        `r"or[@a-z][a-z_0-9\.\[\]\"'-]"`,
+			out:       "or[@a-z][a-z_0-9\\.\\[\\]\\\"'-]",
 			expectErr: false,
 		},
 	}

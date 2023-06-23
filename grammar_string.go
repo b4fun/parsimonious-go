@@ -7,20 +7,20 @@ import (
 )
 
 var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux) {
-doubleQuotedCharacters := NewRegex(
+	doubleQuotedCharacters := NewRegex(
 		"",
 		regexp2.MustCompile(
 			`[^"\\]*(?:\\.[^"\\]*)*`,
 			regexp2.RE2|regexp2.Singleline|regexp2.Unicode,
 		),
 	)
-			singleQuotedCharacters := NewRegex(
-				"",
-				regexp2.MustCompile(
-					`[^'\\]*(?:\\.[^'\\]*)*`,
-					regexp2.RE2|regexp2.Singleline|regexp2.Unicode,
-				),
-			)
+	singleQuotedCharacters := NewRegex(
+		"",
+		regexp2.MustCompile(
+			`[^'\\]*(?:\\.[^'\\]*)*`,
+			regexp2.RE2|regexp2.Singleline|regexp2.Unicode,
+		),
+	)
 
 	doubleQuoted := NewSequence(
 		"double_quoted",

@@ -60,24 +60,24 @@ func shouldCastAsExpressions(v any) ([]Expression, error) {
 	return expressions, nil
 }
 
-var parsimoniousGrammar  *Grammar
+var parsimoniousGrammar *Grammar
 
-var spacelessLiteral =NewOneOf(
-				"spaceless_literal",
-				[]Expression{
-					NewRegex(
-						"",
-						regexp2.MustCompile(`(?si)^r?"[^"\\]*(?:\\.[^"\\]*)*"`, regexp2.RE2),
-					),
-					NewRegex(
-						"",
-						regexp2.MustCompile(`(?si)^r?'[^'\\]*(?:\\.[^'\\]*)*'`, regexp2.RE2),
-					),
-				},
-			)
+var spacelessLiteral = NewOneOf(
+	"spaceless_literal",
+	[]Expression{
+		NewRegex(
+			"",
+			regexp2.MustCompile(`(?si)^r?"[^"\\]*(?:\\.[^"\\]*)*"`, regexp2.RE2),
+		),
+		NewRegex(
+			"",
+			regexp2.MustCompile(`(?si)^r?'[^'\\]*(?:\\.[^'\\]*)*'`, regexp2.RE2),
+		),
+	},
+)
 
 func initParsimoniousGrammar() (*Grammar, error) {
-	mux:= createRuleVisitor(false, []Expression{spacelessLiteral})
+	mux := createRuleVisitor(false, []Expression{spacelessLiteral})
 	bootstrapTree, err := ParseWithExpression(createBootstrapRules(), ruleSyntax, 0)
 	if err != nil {
 		return nil, fmt.Errorf("parse bootstrap grammar: %w", err)
@@ -92,7 +92,6 @@ func initParsimoniousGrammar() (*Grammar, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse parsimonious grammar: %w", err)
 	}
-
 
 	result, err := asGrammar(mux.Visit(tree))
 	if err != nil {
@@ -111,7 +110,7 @@ func init() {
 }
 
 type Grammar struct {
-	rules map[string]Expression
+	rules       map[string]Expression
 	defaultRule Expression
 }
 

@@ -99,7 +99,7 @@ func (mux *NodeVisitorMux) VisitWith(
 	return mux
 }
 
-func visitWithChildren(f NodeVisitWithChildrenFunc) NodeVisitFunc {
+func VisitWithChildren(f NodeVisitWithChildrenFunc) NodeVisitFunc {
 	return func(v NodeVisitor, node *Node) (any, error) {
 		children := make([]any, 0, len(node.Children))
 		for _, child := range node.Children {
@@ -118,7 +118,7 @@ func (mux *NodeVisitorMux) VisitWithChildren(
 	exprName string,
 	f NodeVisitWithChildrenFunc,
 ) *NodeVisitorMux {
-	return mux.VisitWith(exprName, visitWithChildren(f))
+	return mux.VisitWith(exprName, VisitWithChildren(f))
 }
 
 func (mux *NodeVisitorMux) Visit(

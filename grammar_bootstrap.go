@@ -219,7 +219,7 @@ func createRuleVisitor(
 		}
 	}
 
-	defaultVisitor := visitWithChildren(func(node *Node, children []any) (any, error) {
+	defaultVisitor := VisitWithChildren(func(node *Node, children []any) (any, error) {
 		debugf(
 			"[default visitor] visiting <Node: %s start:%d, end:%d> with children (count=%d)\n",
 			node.Expression, node.Start, node.End, len(children),

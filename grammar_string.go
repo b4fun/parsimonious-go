@@ -122,7 +122,7 @@ var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux)
 	}
 
 	mux := NewNodeVisitorMux(
-		visitWithChildren(func(node *Node, children []any) (any, error) {
+		VisitWithChildren(func(node *Node, children []any) (any, error) {
 			if len(children) > 0 {
 				return children, nil
 			}

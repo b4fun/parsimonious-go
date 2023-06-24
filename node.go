@@ -10,21 +10,21 @@ type Node struct {
 	// Expression is the expression that matched this node.
 	Expression Expression
 	// Text is the text that matched this node.
-	Text       string
+	Text string
 	// Start is the rune start index of the match.
-	Start      int
+	Start int
 	// End is the rune end index of the match.
-	End        int
+	End int
 	// Children are the child nodes of this node.
-	Children   []*Node
+	Children []*Node
 	// Match is the string that matched this node from the regex expression.
-	Match      string
+	Match string
 }
 
 func (n *Node) String() string {
 	return fmt.Sprintf(
-		"<Node: %s start:%d, end:%d>\n",
-		n.Expression, n.Start, n.End,
+		"<Node: %s start:%d, end:%d children:%d>\n",
+		n.Expression, n.Start, n.End, len(n.Children),
 	)
 }
 

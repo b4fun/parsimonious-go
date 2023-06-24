@@ -416,7 +416,7 @@ func createRuleVisitor(
 		}
 		pattern := "^" + literal.literal
 
-		var reOptions regexp2.RegexOptions = regexp2.RE2
+		var reOptions regexp2.RegexOptions = regexp2.Unicode
 		flags, err := shouldCastAsNode(children[2])
 		if err != nil {
 			return nil, fmt.Errorf("regex (flags): %w", err)

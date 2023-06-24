@@ -32,6 +32,8 @@ func Test_UnicodeGrammar(t *testing.T) {
 	0️⃣ ➕ 1️⃣
 	
 # comment - 2
+
+9️⃣4️⃣7️⃣ ➕ 1️⃣ ➖ 2️⃣	➕ 3️⃣4️⃣
 	`
 	t.Logf("%q\n", program)
 
@@ -43,6 +45,7 @@ func Test_UnicodeGrammar(t *testing.T) {
 	t.Log("\n" + parsimonious.DumpNodeExprTree(tree))
 
 	countStatements := 0
+	countDigits := 0
 	mux := parsimonious.NewNodeVisitorMux(
 		parsimonious.VisitWithChildren(func(node *parsimonious.Node, children []interface{}) (interface{}, error) {
 			t.Logf("visiting node with default visitor: %s", node)
@@ -54,6 +57,11 @@ func Test_UnicodeGrammar(t *testing.T) {
 			countStatements++
 
 			return children, nil
+		}).
+		VisitWithChildren("digits", func(node *parsimonious.Node, children []interface{}) (interface{}, error) {
+			countDigits++
+
+			return children, nil
 		})
 	_, err = mux.Visit(tree)
 	if err != nil {
@@ -61,8 +69,12 @@ func Test_UnicodeGrammar(t *testing.T) {
 		return
 	}
 
-	if countStatements != 1 {
-		t.Errorf("expect 1 statement, got %d", countStatements)
+	if countStatements != 2 {
+		t.Errorf("expect 2 statements, got %d", countStatements)
+		return
+	}
+	if countDigits != 6 {
+		t.Errorf("expect 6 digits, got %d", countDigits)
 		return
 	}
 }

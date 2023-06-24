@@ -139,7 +139,7 @@ var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux)
 }()
 
 func evalPythonStringValue(input string) (string, error) {
-	tree, err := ParseWithExpression(pythonStringExpr, input, 0)
+	tree, err := ParseWithExpression(pythonStringExpr, input)
 	if err != nil {
 		return "", err
 	}

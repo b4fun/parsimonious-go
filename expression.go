@@ -147,16 +147,50 @@ type Expression interface {
 	// TODO: maybe we should get rid of this?
 	SetExprName(string)
 	// Match matches the expression against the given text at the given rune position.
-	Match(text string, pos int) (*Node, error)
+	Match(text string, parseOpts *ParseOptions) (*Node, error)
 
 	// matchWithCache matches the expression against the given text at the given rune position. (internal usage)
-	matchWithCache(text string, pos int, cache nodeCache) *matchResult
+	matchWithCache(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult
 	// hash returns a hash value for the expression. (internal usage)
 	hash() uint64
 }
 
-func ParseWithExpression(expr Expression, text string, pos int) (*Node, error) {
-	node, err := expr.Match(text, pos)
+// ParseOptions represents options for parsing.
+type ParseOptions struct {
+	pos int
+	debug bool
+}
+
+func (opts *ParseOptions) withPos(newPos int) *ParseOptions {
+	return &ParseOptions{
+		pos: newPos,
+		debug: opts.debug,
+	}
+}	
+
+func createParseOpts(opts ...ParseOption) *ParseOptions {
+	parseOpts := &ParseOptions{}
+	for _, o := range opts {
+		o(parseOpts)
+	}
+	return parseOpts
+}
+
+// ParseOption configures a ParseOptions.
+type ParseOption func(*ParseOptions)
+
+// ParseWithDebug enables debug mode on parsing.
+func ParseWithDebug(debug bool) func(*ParseOptions) {
+	return func(opts *ParseOptions) {
+		opts.debug = debug
+	}
+}
+
+// ParseWithExpression parses the given text with the given expression.
+func ParseWithExpression(expr Expression, text string, opts ...ParseOption) (*Node, error) {
+	parseOpts := createParseOpts(opts...)
+
+	node, err := expr.Match(text, parseOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +236,7 @@ type exprImpl interface {
 	exprName() string
 	setExprName(s string)
 	identity() []byte // for hashing
-	uncachedMatch(text string, pos int, cache nodeCache) *matchResult
+	uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult
 	asRule() string
 }
 
@@ -218,32 +252,32 @@ func (e *expression) SetExprName(n string) {
 	e.impl.setExprName(n)
 }
 
-func (e *expression) Match(text string, pos int) (*Node, error) {
+func (e *expression) Match(text string, parseOpts *ParseOptions) (*Node, error) {
 	cache := new(nodeCache)
-	result := e.matchWithCache(text, pos, *cache)
+	result := e.matchWithCache(text, parseOpts, *cache)
 	switch {
 	case result.isMatchedNode():
 		return result.Node, nil
 	case result.isMatchFailed():
 		return nil, result.Err
 	default:
-		return nil, fmt.Errorf("%w: text=%s, pos=%d", ErrParseFailed, text, pos)
+		return nil, fmt.Errorf("%w: text=%s, pos=%d", ErrParseFailed, text, parseOpts.pos)
 	}
 }
 
-func (e *expression) matchWithCache(text string, pos int, cache nodeCache) *matchResult {
-	node := cache.get(e, pos)
+func (e *expression) matchWithCache(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
+	node := cache.get(e, parseOpts.pos)
 	if node == nil {
-		cache.set(e, pos, nodeInProgress)
-		matchResult := e.impl.uncachedMatch(text, pos, cache)
+		cache.set(e, parseOpts.pos, nodeInProgress)
+		matchResult := e.impl.uncachedMatch(text, parseOpts, cache)
 		if matchResult.isMatchFailed() {
 			return matchResult
 		}
 		node = matchResult.Node
-		cache.set(e, pos, node)
+		cache.set(e, parseOpts.pos, node)
 	}
 	if node == nodeInProgress {
-		return matchFailed(fmt.Errorf("%w: text=%s, pos=%d", ErrLeftRecursionError, text, pos))
+		return matchFailed(fmt.Errorf("%w: text=%s, pos=%d", ErrLeftRecursionError, text, parseOpts.pos))
 	}
 	if node == nil {
 		return noMatch()
@@ -302,8 +336,9 @@ func (l *Literal) identity() []byte {
 	return []byte("literal:" + l.name + ":" + l.literal)
 }
 
-func (l *Literal) uncachedMatch(text string, pos int, _ nodeCache) *matchResult {
-	if utf8.RuneCountInString(text) < pos+len(l.literal) {
+func (l *Literal) uncachedMatch(text string, parseOpts *ParseOptions, _ nodeCache) *matchResult {
+	pos := parseOpts.pos
+	if utf8.RuneCountInString(text) < pos+l.literalRuneCount {
 		return noMatch()
 	}
 
@@ -355,11 +390,11 @@ func (s *Sequence) identity() []byte {
 	return []byte("sequence:" + s.name)
 }
 
-func (s *Sequence) uncachedMatch(text string, pos int, cache nodeCache) *matchResult {
-	curPos := pos
+func (s *Sequence) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
+	curPos := parseOpts.pos
 	children := make([]*Node, 0, len(s.members))
 	for idx := range s.members {
-		matchResult := s.members[idx].matchWithCache(text, curPos, cache)
+		matchResult := s.members[idx].matchWithCache(text, parseOpts.withPos(curPos), cache)
 		if matchResult.isMatchFailed() {
 			return matchResult
 		}
@@ -371,7 +406,7 @@ func (s *Sequence) uncachedMatch(text string, pos int, cache nodeCache) *matchRe
 		curPos += node.End - node.Start
 	}
 
-	node := newNodeWithChildren(s, text, pos, curPos, children)
+	node := newNodeWithChildren(s, text, parseOpts.pos, curPos, children)
 	return matchedNode(node)
 }
 
@@ -428,14 +463,14 @@ func (of *OneOf) identity() []byte {
 	return []byte("oneOf:" + of.name)
 }
 
-func (of *OneOf) uncachedMatch(text string, pos int, cache nodeCache) *matchResult {
+func (of *OneOf) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
 	for idx := range of.members {
-		matchResult := of.members[idx].matchWithCache(text, pos, cache)
+		matchResult := of.members[idx].matchWithCache(text, parseOpts, cache)
 		if matchResult.isMatchFailed() {
 			return matchResult
 		}
 		if matchResult.isMatchedNode() {
-			oneOfNode := newNodeWithChildren(of, text, pos, matchResult.Node.End, []*Node{matchResult.Node})
+			oneOfNode := newNodeWithChildren(of, text, parseOpts.pos, matchResult.Node.End, []*Node{matchResult.Node})
 			return matchedNode(oneOfNode)
 		}
 	}
@@ -502,12 +537,13 @@ func (l *Lookahead) identity() []byte {
 	return []byte("lookahead:" + l.name)
 }
 
-func (l *Lookahead) uncachedMatch(text string, pos int, cache nodeCache) *matchResult {
-	matchResult := l.member.matchWithCache(text, pos, cache)
+func (l *Lookahead) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
+	matchResult := l.member.matchWithCache(text, parseOpts, cache)
 	if matchResult.isMatchFailed() {
 		return matchResult
 	}
 
+	pos := parseOpts.pos
 	switch {
 	case matchResult.isNoMatch() && l.negative:
 		return matchedNode(newNode(l, text, pos, pos))
@@ -593,12 +629,12 @@ func (q *Quantifier) identity() []byte {
 	return []byte("quantifier:" + q.name)
 }
 
-func (q *Quantifier) uncachedMatch(text string, pos int, cache nodeCache) *matchResult {
-	curPos := pos
+func (q *Quantifier) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
+	curPos := parseOpts.pos
 	children := make([]*Node, 0)
 	size := len(text)
 	for curPos < size && float64(len(children)) < q.max {
-		matchResult := q.member.matchWithCache(text, curPos, cache)
+		matchResult := q.member.matchWithCache(text, parseOpts.withPos(curPos), cache)
 		if matchResult.isMatchFailed() {
 			return matchResult
 		}
@@ -614,7 +650,7 @@ func (q *Quantifier) uncachedMatch(text string, pos int, cache nodeCache) *match
 		return noMatch()
 	}
 
-	node := newNodeWithChildren(q, text, pos, curPos, children)
+	node := newNodeWithChildren(q, text, parseOpts.pos, curPos, children)
 	return matchedNode(node)
 }
 
@@ -680,7 +716,8 @@ func (r *Regex) identity() []byte {
 	return []byte("re:" + r.name + ":" + r.re.String())
 }
 
-func (r *Regex) uncachedMatch(text string, pos int, cache nodeCache) *matchResult {
+func (r *Regex) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
+	pos := parseOpts.pos
 	matchGroups, err := r.re.FindStringMatch(sliceStringAsRuneSlice(text, pos, -1))
 	if err != nil {
 		return matchFailed(err)
@@ -740,7 +777,7 @@ func (r *LazyReference) identity() []byte {
 	return []byte("lazy_reference:" + r.referenceName)
 }
 
-func (r *LazyReference) uncachedMatch(text string, pos int, cache nodeCache) *matchResult {
+func (r *LazyReference) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
 	return matchFailed(fmt.Errorf("lazy reference %q is not resolved", r.referenceName))
 }
 

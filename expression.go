@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"math"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/dlclark/regexp2"
 )
@@ -153,8 +154,11 @@ func ParseWithExpression(expr Expression, text string, pos int) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	if node.End < len(text) {
-		return nil, fmt.Errorf("incomplete input parsed, parsed end=%d, input length=%d", node.End, len(text))
+	if textLen := utf8.RuneCountInString(text); node.End < textLen {
+		return nil, fmt.Errorf(
+			"incomplete input parsed, parsed end=%d, input length=%d",
+			node.End, textLen,
+		)
 	}
 
 	return node, nil
@@ -257,8 +261,9 @@ func (e *expression) String() string {
 type Literal struct {
 	expression
 
-	literal string
-	name    string
+	literal          string
+	literalRuneCount int
+	name             string
 }
 
 var _ Expression = (*Literal)(nil)
@@ -266,8 +271,9 @@ var _ exprImpl = (*Literal)(nil)
 
 func NewLiteralWithName(name string, literal string) *Literal {
 	rv := &Literal{
-		literal: literal,
-		name:    name,
+		literal:          literal,
+		literalRuneCount: utf8.RuneCountInString(literal),
+		name:             name,
 	}
 	rv.expression = expression{impl: rv}
 
@@ -291,12 +297,12 @@ func (l *Literal) identity() []byte {
 }
 
 func (l *Literal) uncachedMatch(text string, pos int, _ nodeCache) *matchResult {
-	if len(text) < pos+len(l.literal) {
+	if utf8.RuneCountInString(text) < pos+len(l.literal) {
 		return noMatch()
 	}
 
-	if text[pos:pos+len(l.literal)] == l.literal {
-		node := newNode(l, text, pos, pos+len(l.literal))
+	if sliceStringAsRuneSlice(text, pos, pos+l.literalRuneCount) == l.literal {
+		node := newNode(l, text, pos, pos+l.literalRuneCount)
 		return matchedNode(node)
 	}
 
@@ -670,7 +676,7 @@ func (r *Regex) identity() []byte {
 }
 
 func (r *Regex) uncachedMatch(text string, pos int, cache nodeCache) *matchResult {
-	matchGroups, err := r.re.FindStringMatch(text[pos:])
+	matchGroups, err := r.re.FindStringMatch(sliceStringAsRuneSlice(text, pos, -1))
 	if err != nil {
 		return matchFailed(err)
 	}

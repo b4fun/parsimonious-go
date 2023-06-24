@@ -5,13 +5,20 @@ import (
 	"strings"
 )
 
+// Node represents a node in the parse tree.
 type Node struct {
+	// Expression is the expression that matched this node.
 	Expression Expression
+	// Text is the text that matched this node.
 	Text       string
+	// Start is the rune start index of the match.
 	Start      int
+	// End is the rune end index of the match.
 	End        int
+	// Children are the child nodes of this node.
 	Children   []*Node
-	Match      string // for regex expression
+	// Match is the string that matched this node from the regex expression.
+	Match      string
 }
 
 func (n *Node) String() string {
@@ -29,7 +36,7 @@ func newNode(
 ) *Node {
 	return &Node{
 		Expression: expression,
-		Text:       fullText[start:end],
+		Text:       sliceStringAsRuneSlice(fullText, start, end),
 		Start:      start,
 		End:        end,
 		Children:   make([]*Node, 0),

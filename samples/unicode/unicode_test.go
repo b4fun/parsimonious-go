@@ -6,27 +6,63 @@ import (
 	"github.com/b4fun/parsimonious-go"
 )
 
-
-const grammar = `
-#指令 = 空格* (注释 | 语句) 空格* 换行?
-#换行 = "\n" / "\r\n"
-#空格 = " " / "\t"
-#注释 = "#" (!换行 .)*
-#语句 = 数字* 空格* 操作符 空格* 数字*
-#数字 = ~r"[0-9]"
-#操作符 = "+" / "-"
-
-中文 = "a" / "b" / "c"
+const grammarText = `
+program = _ statement*
+statement = digits (operator digits)*
+digits = digit+ _
+digit = "0️⃣" / "1️⃣" / "2️⃣" / "3️⃣" / "4️⃣" / "5️⃣" / "6️⃣" / "7️⃣" / "8️⃣" / "9️⃣"
+operator = ("➕" / "➖") _
+_ = meaninglessness*
+meaninglessness = ~r"\s+" / comment
+comment = ~r"#[^\r\n]*"
 `
 
 func Test_UnicodeGrammar(t *testing.T) {
-	grammar, err := parsimonious.NewGrammar(grammar)
+	withDebug := parsimonious.ParseWithDebug(true)
+
+	grammar, err := parsimonious.NewGrammar(grammarText, withDebug)
 	if err != nil {
-		t.Fatal(err)
+		t.Errorf("parse grammar failed: %v", err)
+		return
 	}
-	tree, err := grammar.Parse("1+2")
+
+	program := `
+	# comment - 1
+
+	0️⃣ ➕ 1️⃣
+	
+# comment - 2
+	`
+	t.Logf("%q\n", program)
+
+	tree, err := grammar.Parse(program, withDebug)
 	if err != nil {
-		t.Fatal(err)
+		t.Errorf("parse sample failed: %v", err)
+		return
 	}
-	t.Log(tree)
+	t.Log("\n" + parsimonious.DumpNodeExprTree(tree))
+
+	countStatements := 0
+	mux := parsimonious.NewNodeVisitorMux(
+		parsimonious.VisitWithChildren(func(node *parsimonious.Node, children []interface{}) (interface{}, error) {
+			t.Logf("visiting node with default visitor: %s", node)
+
+			return node.Text, nil
+		}),
+	).
+		VisitWithChildren("statement", func(node *parsimonious.Node, children []interface{}) (interface{}, error) {
+			countStatements++
+
+			return children, nil
+		})
+	_, err = mux.Visit(tree)
+	if err != nil {
+		t.Errorf("mux visit error: %v", err)
+		return
+	}
+
+	if countStatements != 1 {
+		t.Errorf("expect 1 statement, got %d", countStatements)
+		return
+	}
 }

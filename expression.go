@@ -641,7 +641,6 @@ func (q *Quantifier) asRule() string {
 
 	return formatRuleRHSWithOptionalName(
 		q.exprName(),
-		// fmt.Sprintf("%s%s", joinExpressionAsRule(q.member), quantifier),
 		fmt.Sprintf("%s%s", q.member, quantifier),
 	)
 }

@@ -445,11 +445,14 @@ func createRuleVisitor(
 	})
 
 	visitSpacelessLiteral := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+		//debugf("spaceless literal: %q\n", node.Text)
 		literalValue, err := evalPythonStringValue(node.Text)
 		if err != nil {
+			//debugf("spaceless literal %q eval failed %s\n", node.Text, err)
 			return nil, fmt.Errorf("spaceless literal: %q %w", node.Text, err)
 		}
 
+		//debugf("spaceless literal %q matched with literal %q\n", node.Text, literalValue)
 		return NewLiteral(literalValue), nil
 	})
 

@@ -157,16 +157,22 @@ type Expression interface {
 
 // ParseOptions represents options for parsing.
 type ParseOptions struct {
-	pos int
+	pos   int
 	debug bool
 }
 
 func (opts *ParseOptions) withPos(newPos int) *ParseOptions {
 	return &ParseOptions{
-		pos: newPos,
+		pos:   newPos,
 		debug: opts.debug,
 	}
-}	
+}
+
+func (opts *ParseOptions) debugf(format string, args ...interface{}) {
+	if opts.debug {
+		fmt.Printf(format, args...)
+	}
+}
 
 func createParseOpts(opts ...ParseOption) *ParseOptions {
 	parseOpts := &ParseOptions{}
@@ -724,20 +730,31 @@ func (r *Regex) identity() []byte {
 
 func (r *Regex) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
 	pos := parseOpts.pos
-	matchGroups, err := r.re.FindStringMatch(sliceStringAsRuneSlice(text, pos, -1))
+	textToMatch := sliceStringAsRuneSlice(text, pos, -1)
+
+	//parseOpts.debugf("[%s] trying regex (%s) match at pos %d %q\n",r, r.re,pos, textToMatch)
+
+	matchGroups, err := r.re.FindStringMatch(textToMatch)
 	if err != nil {
+		//parseOpts.debugf("[%s] regex match failed: %s (pos=%d)\n", r, err, pos)
+
 		return matchFailed(err)
 	}
 	if matchGroups == nil {
+		//parseOpts.debugf("[%s] regex match failed: no match (pos=%d)\n", r, pos)
+
 		return noMatch()
 	}
 	if len(matchGroups.Captures) < 1 {
+		//parseOpts.debugf("[%s] regex match failed: no match (pos=%d)\n", r, pos)
+
 		return noMatch()
 	}
 
 	match := matchGroups.Captures[0]
 	matchedEnd := pos + match.Index + match.Length
 
+	//parseOpts.debugf("[%s] regex matched: (pos=%d)\n", r, pos)
 	node := newRegexNode(r, text, pos, matchedEnd, match.String())
 	return matchedNode(node)
 }

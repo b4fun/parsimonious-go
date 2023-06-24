@@ -146,12 +146,12 @@ func (g *Grammar) GetRule(ruleName string) (Expression, bool) {
 	return rule, ok
 }
 
-func NewGrammar(input string) (*Grammar, error) {
-	tree, err := parsimoniousGrammar.Parse(input)
+func NewGrammar(input string, parseOpts ...ParseOption) (*Grammar, error) {
+	tree, err := parsimoniousGrammar.Parse(input, parseOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("parse grammar: %w", err)
 	}
 
-	mux := createRuleVisitor(false, nil)
+	mux := createRuleVisitor(createParseOpts(parseOpts...).debug, nil)
 	return asGrammar(mux.Visit(tree))
 }

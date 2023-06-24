@@ -6,6 +6,21 @@ import (
 	"github.com/dlclark/regexp2"
 )
 
+func sliceStringAsRuneSlice(s string, from, to int) string {
+	switch {
+	case from < 0 && to < 0:
+		return s
+	case from < 0 && to >= 0:
+		return string([]rune(s)[:to])
+	case from >= 0 && to < 0:
+		return string([]rune(s)[from:])
+	case from >= 0 && to >= 0:
+		return string([]rune(s)[from:to])
+	default:
+		panic(fmt.Sprintf("invalid sliceStringAsRuneSlice: %d, %d", from, to))
+	}
+}
+
 var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux) {
 	doubleQuotedCharacters := NewRegex(
 		"",
@@ -107,7 +122,7 @@ var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux)
 	}
 
 	mux := NewNodeVisitorMux(
-		visitWithChildren(func(node *Node, children []any) (any, error) {
+		VisitWithChildren(func(node *Node, children []any) (any, error) {
 			if len(children) > 0 {
 				return children, nil
 			}
@@ -124,7 +139,7 @@ var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux)
 }()
 
 func evalPythonStringValue(input string) (string, error) {
-	tree, err := ParseWithExpression(pythonStringExpr, input, 0)
+	tree, err := ParseWithExpression(pythonStringExpr, input)
 	if err != nil {
 		return "", err
 	}

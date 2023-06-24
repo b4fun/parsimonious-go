@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"math"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/dlclark/regexp2"
 )
@@ -140,34 +141,83 @@ func joinExpressionsAsRule(exprs []Expression, sep string) string {
 type Expression interface {
 	fmt.Stringer
 
+	// ExprName returns the name of the expression.
 	ExprName() string
-	SetExprName(string) // TODO: maybe we should get rid of this?
-	Match(text string, pos int) (*Node, error)
+	// SetExprName sets the name of the expression.
+	// TODO: maybe we should get rid of this?
+	SetExprName(string)
+	// Match matches the expression against the given text at the given rune position.
+	Match(text string, parseOpts *ParseOptions) (*Node, error)
 
-	matchWithCache(text string, pos int, cache nodeCache) *matchResult
-	hash() uint64 // for caching
+	// matchWithCache matches the expression against the given text at the given rune position. (internal usage)
+	matchWithCache(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult
+	// hash returns a hash value for the expression. (internal usage)
+	hash() uint64
 }
 
-func ParseWithExpression(expr Expression, text string, pos int) (*Node, error) {
-	node, err := expr.Match(text, pos)
+// ParseOptions represents options for parsing.
+type ParseOptions struct {
+	pos   int
+	debug bool
+}
+
+func (opts *ParseOptions) withPos(newPos int) *ParseOptions {
+	return &ParseOptions{
+		pos:   newPos,
+		debug: opts.debug,
+	}
+}
+
+func (opts *ParseOptions) debugf(format string, args ...interface{}) {
+	if opts.debug {
+		fmt.Printf(format, args...)
+	}
+}
+
+func createParseOpts(opts ...ParseOption) *ParseOptions {
+	parseOpts := &ParseOptions{}
+	for _, o := range opts {
+		o(parseOpts)
+	}
+	return parseOpts
+}
+
+// ParseOption configures a ParseOptions.
+type ParseOption func(*ParseOptions)
+
+// ParseWithDebug enables debug mode on parsing.
+func ParseWithDebug(debug bool) func(*ParseOptions) {
+	return func(opts *ParseOptions) {
+		opts.debug = debug
+	}
+}
+
+// ParseWithExpression parses the given text with the given expression.
+func ParseWithExpression(expr Expression, text string, opts ...ParseOption) (*Node, error) {
+	parseOpts := createParseOpts(opts...)
+
+	node, err := expr.Match(text, parseOpts)
 	if err != nil {
 		return nil, err
 	}
-	if node.End < len(text) {
-		return nil, fmt.Errorf("incomplete input parsed, parsed end=%d, input length=%d", node.End, len(text))
+	if textLen := utf8.RuneCountInString(text); node.End < textLen {
+		return nil, fmt.Errorf(
+			"incomplete input parsed, parsed end=%d, input length=%d",
+			node.End, textLen,
+		)
 	}
 
 	return node, nil
 }
 
-type WithResolveRefs interface {
+type withResolveRefs interface {
 	Expression
 
 	ResolveRefs(rules map[string]Expression) (Expression, error)
 }
 
 func resolveRefsFor(v Expression, rules map[string]Expression) (Expression, error) {
-	expr, ok := v.(WithResolveRefs)
+	expr, ok := v.(withResolveRefs)
 	if !ok {
 		return v, nil
 	}
@@ -192,7 +242,7 @@ type exprImpl interface {
 	exprName() string
 	setExprName(s string)
 	identity() []byte // for hashing
-	uncachedMatch(text string, pos int, cache nodeCache) *matchResult
+	uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult
 	asRule() string
 }
 
@@ -208,32 +258,32 @@ func (e *expression) SetExprName(n string) {
 	e.impl.setExprName(n)
 }
 
-func (e *expression) Match(text string, pos int) (*Node, error) {
+func (e *expression) Match(text string, parseOpts *ParseOptions) (*Node, error) {
 	cache := new(nodeCache)
-	result := e.matchWithCache(text, pos, *cache)
+	result := e.matchWithCache(text, parseOpts, *cache)
 	switch {
 	case result.isMatchedNode():
 		return result.Node, nil
 	case result.isMatchFailed():
 		return nil, result.Err
 	default:
-		return nil, fmt.Errorf("%w: text=%s, pos=%d", ErrParseFailed, text, pos)
+		return nil, fmt.Errorf("%w: text=%s, pos=%d", ErrParseFailed, text, parseOpts.pos)
 	}
 }
 
-func (e *expression) matchWithCache(text string, pos int, cache nodeCache) *matchResult {
-	node := cache.get(e, pos)
+func (e *expression) matchWithCache(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
+	node := cache.get(e, parseOpts.pos)
 	if node == nil {
-		cache.set(e, pos, nodeInProgress)
-		matchResult := e.impl.uncachedMatch(text, pos, cache)
+		cache.set(e, parseOpts.pos, nodeInProgress)
+		matchResult := e.impl.uncachedMatch(text, parseOpts, cache)
 		if matchResult.isMatchFailed() {
 			return matchResult
 		}
 		node = matchResult.Node
-		cache.set(e, pos, node)
+		cache.set(e, parseOpts.pos, node)
 	}
 	if node == nodeInProgress {
-		return matchFailed(fmt.Errorf("%w: text=%s, pos=%d", ErrLeftRecursionError, text, pos))
+		return matchFailed(fmt.Errorf("%w: text=%s, pos=%d", ErrLeftRecursionError, text, parseOpts.pos))
 	}
 	if node == nil {
 		return noMatch()
@@ -257,8 +307,9 @@ func (e *expression) String() string {
 type Literal struct {
 	expression
 
-	literal string
-	name    string
+	literal          string
+	literalRuneCount int
+	name             string
 }
 
 var _ Expression = (*Literal)(nil)
@@ -266,8 +317,9 @@ var _ exprImpl = (*Literal)(nil)
 
 func NewLiteralWithName(name string, literal string) *Literal {
 	rv := &Literal{
-		literal: literal,
-		name:    name,
+		literal:          literal,
+		literalRuneCount: utf8.RuneCountInString(literal),
+		name:             name,
 	}
 	rv.expression = expression{impl: rv}
 
@@ -290,13 +342,14 @@ func (l *Literal) identity() []byte {
 	return []byte("literal:" + l.name + ":" + l.literal)
 }
 
-func (l *Literal) uncachedMatch(text string, pos int, _ nodeCache) *matchResult {
-	if len(text) < pos+len(l.literal) {
+func (l *Literal) uncachedMatch(text string, parseOpts *ParseOptions, _ nodeCache) *matchResult {
+	pos := parseOpts.pos
+	if utf8.RuneCountInString(text) < pos+l.literalRuneCount {
 		return noMatch()
 	}
 
-	if text[pos:pos+len(l.literal)] == l.literal {
-		node := newNode(l, text, pos, pos+len(l.literal))
+	if sliceStringAsRuneSlice(text, pos, pos+l.literalRuneCount) == l.literal {
+		node := newNode(l, text, pos, pos+l.literalRuneCount)
 		return matchedNode(node)
 	}
 
@@ -319,7 +372,7 @@ type Sequence struct {
 
 var _ Expression = (*Sequence)(nil)
 var _ exprImpl = (*Sequence)(nil)
-var _ WithResolveRefs = (*Sequence)(nil)
+var _ withResolveRefs = (*Sequence)(nil)
 
 func NewSequence(name string, members []Expression) *Sequence {
 	rv := &Sequence{
@@ -343,11 +396,11 @@ func (s *Sequence) identity() []byte {
 	return []byte("sequence:" + s.name)
 }
 
-func (s *Sequence) uncachedMatch(text string, pos int, cache nodeCache) *matchResult {
-	curPos := pos
+func (s *Sequence) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
+	curPos := parseOpts.pos
 	children := make([]*Node, 0, len(s.members))
 	for idx := range s.members {
-		matchResult := s.members[idx].matchWithCache(text, curPos, cache)
+		matchResult := s.members[idx].matchWithCache(text, parseOpts.withPos(curPos), cache)
 		if matchResult.isMatchFailed() {
 			return matchResult
 		}
@@ -359,7 +412,7 @@ func (s *Sequence) uncachedMatch(text string, pos int, cache nodeCache) *matchRe
 		curPos += node.End - node.Start
 	}
 
-	node := newNodeWithChildren(s, text, pos, curPos, children)
+	node := newNodeWithChildren(s, text, parseOpts.pos, curPos, children)
 	return matchedNode(node)
 }
 
@@ -392,7 +445,7 @@ type OneOf struct {
 
 var _ Expression = (*OneOf)(nil)
 var _ exprImpl = (*OneOf)(nil)
-var _ WithResolveRefs = (*OneOf)(nil)
+var _ withResolveRefs = (*OneOf)(nil)
 
 func NewOneOf(name string, members []Expression) *OneOf {
 	rv := &OneOf{
@@ -416,14 +469,14 @@ func (of *OneOf) identity() []byte {
 	return []byte("oneOf:" + of.name)
 }
 
-func (of *OneOf) uncachedMatch(text string, pos int, cache nodeCache) *matchResult {
+func (of *OneOf) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
 	for idx := range of.members {
-		matchResult := of.members[idx].matchWithCache(text, pos, cache)
+		matchResult := of.members[idx].matchWithCache(text, parseOpts, cache)
 		if matchResult.isMatchFailed() {
 			return matchResult
 		}
 		if matchResult.isMatchedNode() {
-			oneOfNode := newNodeWithChildren(of, text, pos, matchResult.Node.End, []*Node{matchResult.Node})
+			oneOfNode := newNodeWithChildren(of, text, parseOpts.pos, matchResult.Node.End, []*Node{matchResult.Node})
 			return matchedNode(oneOfNode)
 		}
 	}
@@ -461,7 +514,7 @@ type Lookahead struct {
 
 var _ Expression = (*Lookahead)(nil)
 var _ exprImpl = (*Lookahead)(nil)
-var _ WithResolveRefs = (*Lookahead)(nil)
+var _ withResolveRefs = (*Lookahead)(nil)
 
 func NewLookahead(name string, member Expression, negative bool) *Lookahead {
 	rv := &Lookahead{
@@ -490,12 +543,13 @@ func (l *Lookahead) identity() []byte {
 	return []byte("lookahead:" + l.name)
 }
 
-func (l *Lookahead) uncachedMatch(text string, pos int, cache nodeCache) *matchResult {
-	matchResult := l.member.matchWithCache(text, pos, cache)
+func (l *Lookahead) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
+	matchResult := l.member.matchWithCache(text, parseOpts, cache)
 	if matchResult.isMatchFailed() {
 		return matchResult
 	}
 
+	pos := parseOpts.pos
 	switch {
 	case matchResult.isNoMatch() && l.negative:
 		return matchedNode(newNode(l, text, pos, pos))
@@ -543,7 +597,7 @@ type Quantifier struct {
 
 var _ Expression = (*Quantifier)(nil)
 var _ exprImpl = (*Quantifier)(nil)
-var _ WithResolveRefs = (*Quantifier)(nil)
+var _ withResolveRefs = (*Quantifier)(nil)
 
 func newQuantifier(name string, member Expression, min float64, max float64) *Quantifier {
 	rv := &Quantifier{
@@ -581,12 +635,12 @@ func (q *Quantifier) identity() []byte {
 	return []byte("quantifier:" + q.name)
 }
 
-func (q *Quantifier) uncachedMatch(text string, pos int, cache nodeCache) *matchResult {
-	curPos := pos
+func (q *Quantifier) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
+	curPos := parseOpts.pos
 	children := make([]*Node, 0)
-	size := len(text)
+	size := utf8.RuneCountInString(text)
 	for curPos < size && float64(len(children)) < q.max {
-		matchResult := q.member.matchWithCache(text, curPos, cache)
+		matchResult := q.member.matchWithCache(text, parseOpts.withPos(curPos), cache)
 		if matchResult.isMatchFailed() {
 			return matchResult
 		}
@@ -594,15 +648,21 @@ func (q *Quantifier) uncachedMatch(text string, pos int, cache nodeCache) *match
 			break
 		}
 		node := matchResult.Node
+		//parseOpts.debugf("[%s] matched new node: %s %q\n", q, node, node.Text)
 		children = append(children, node)
-		curPos += node.End - node.Start
+		nodeMatchedLength := node.End - node.Start
+		if nodeMatchedLength == 0 && float64(len(children)) >= q.min {
+			// This is a zero-length match (lookahead), so we need to advance the cursor after reaching minimum
+			break
+		}
+		curPos += nodeMatchedLength
 	}
 
 	if float64(len(children)) < q.min {
 		return noMatch()
 	}
 
-	node := newNodeWithChildren(q, text, pos, curPos, children)
+	node := newNodeWithChildren(q, text, parseOpts.pos, curPos, children)
 	return matchedNode(node)
 }
 
@@ -635,7 +695,6 @@ func (q *Quantifier) asRule() string {
 
 	return formatRuleRHSWithOptionalName(
 		q.exprName(),
-		// fmt.Sprintf("%s%s", joinExpressionAsRule(q.member), quantifier),
 		fmt.Sprintf("%s%s", q.member, quantifier),
 	)
 }
@@ -669,21 +728,33 @@ func (r *Regex) identity() []byte {
 	return []byte("re:" + r.name + ":" + r.re.String())
 }
 
-func (r *Regex) uncachedMatch(text string, pos int, cache nodeCache) *matchResult {
-	matchGroups, err := r.re.FindStringMatch(text[pos:])
+func (r *Regex) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
+	pos := parseOpts.pos
+	textToMatch := sliceStringAsRuneSlice(text, pos, -1)
+
+	//parseOpts.debugf("[%s] trying regex (%s) match at pos %d %q\n",r, r.re,pos, textToMatch)
+
+	matchGroups, err := r.re.FindStringMatch(textToMatch)
 	if err != nil {
+		//parseOpts.debugf("[%s] regex match failed: %s (pos=%d)\n", r, err, pos)
+
 		return matchFailed(err)
 	}
 	if matchGroups == nil {
+		//parseOpts.debugf("[%s] regex match failed: no match (pos=%d)\n", r, pos)
+
 		return noMatch()
 	}
 	if len(matchGroups.Captures) < 1 {
+		//parseOpts.debugf("[%s] regex match failed: no match (pos=%d)\n", r, pos)
+
 		return noMatch()
 	}
 
 	match := matchGroups.Captures[0]
 	matchedEnd := pos + match.Index + match.Length
 
+	//parseOpts.debugf("[%s] regex matched: (pos=%d)\n", r, pos)
 	node := newRegexNode(r, text, pos, matchedEnd, match.String())
 	return matchedNode(node)
 }
@@ -705,7 +776,7 @@ type LazyReference struct {
 
 var _ Expression = (*LazyReference)(nil)
 var _ exprImpl = (*LazyReference)(nil)
-var _ WithResolveRefs = (*LazyReference)(nil)
+var _ withResolveRefs = (*LazyReference)(nil)
 
 func NewLazyReference(referenceName string) *LazyReference {
 	rv := &LazyReference{
@@ -729,7 +800,7 @@ func (r *LazyReference) identity() []byte {
 	return []byte("lazy_reference:" + r.referenceName)
 }
 
-func (r *LazyReference) uncachedMatch(text string, pos int, cache nodeCache) *matchResult {
+func (r *LazyReference) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
 	return matchFailed(fmt.Errorf("lazy reference %q is not resolved", r.referenceName))
 }
 

@@ -5,19 +5,26 @@ import (
 	"strings"
 )
 
+// Node represents a node in the parse tree.
 type Node struct {
+	// Expression is the expression that matched this node.
 	Expression Expression
-	Text       string
-	Start      int
-	End        int
-	Children   []*Node
-	Match      string // for regex expression
+	// Text is the text that matched this node.
+	Text string
+	// Start is the rune start index of the match.
+	Start int
+	// End is the rune end index of the match.
+	End int
+	// Children are the child nodes of this node.
+	Children []*Node
+	// Match is the string that matched this node from the regex expression.
+	Match string
 }
 
 func (n *Node) String() string {
 	return fmt.Sprintf(
-		"<Node: %s start:%d, end:%d>\n",
-		n.Expression, n.Start, n.End,
+		"<Node: %s start:%d, end:%d children:%d>\n",
+		n.Expression, n.Start, n.End, len(n.Children),
 	)
 }
 
@@ -29,7 +36,7 @@ func newNode(
 ) *Node {
 	return &Node{
 		Expression: expression,
-		Text:       fullText[start:end],
+		Text:       sliceStringAsRuneSlice(fullText, start, end),
 		Start:      start,
 		End:        end,
 		Children:   make([]*Node, 0),
@@ -92,7 +99,7 @@ func (mux *NodeVisitorMux) VisitWith(
 	return mux
 }
 
-func visitWithChildren(f NodeVisitWithChildrenFunc) NodeVisitFunc {
+func VisitWithChildren(f NodeVisitWithChildrenFunc) NodeVisitFunc {
 	return func(v NodeVisitor, node *Node) (any, error) {
 		children := make([]any, 0, len(node.Children))
 		for _, child := range node.Children {
@@ -111,7 +118,7 @@ func (mux *NodeVisitorMux) VisitWithChildren(
 	exprName string,
 	f NodeVisitWithChildrenFunc,
 ) *NodeVisitorMux {
-	return mux.VisitWith(exprName, visitWithChildren(f))
+	return mux.VisitWith(exprName, VisitWithChildren(f))
 }
 
 func (mux *NodeVisitorMux) Visit(

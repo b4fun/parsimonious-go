@@ -6,7 +6,6 @@
 
 ## TODO
 
-- [ ] unicode support
 - [ ] fine tune visitor interfaces
 - [ ] fix `spacelss_literal` parsing rule
 - [ ] friendly error 

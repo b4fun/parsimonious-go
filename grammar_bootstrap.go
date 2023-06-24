@@ -219,7 +219,7 @@ func createRuleVisitor(
 		}
 	}
 
-	defaultVisitor := visitWithChildren(func(node *Node, children []any) (any, error) {
+	defaultVisitor := VisitWithChildren(func(node *Node, children []any) (any, error) {
 		debugf(
 			"[default visitor] visiting <Node: %s start:%d, end:%d> with children (count=%d)\n",
 			node.Expression, node.Start, node.End, len(children),
@@ -416,7 +416,7 @@ func createRuleVisitor(
 		}
 		pattern := "^" + literal.literal
 
-		var reOptions regexp2.RegexOptions = regexp2.RE2
+		var reOptions regexp2.RegexOptions = regexp2.Unicode
 		flags, err := shouldCastAsNode(children[2])
 		if err != nil {
 			return nil, fmt.Errorf("regex (flags): %w", err)
@@ -445,11 +445,14 @@ func createRuleVisitor(
 	})
 
 	visitSpacelessLiteral := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+		//debugf("spaceless literal: %q\n", node.Text)
 		literalValue, err := evalPythonStringValue(node.Text)
 		if err != nil {
+			//debugf("spaceless literal %q eval failed %s\n", node.Text, err)
 			return nil, fmt.Errorf("spaceless literal: %q %w", node.Text, err)
 		}
 
+		//debugf("spaceless literal %q matched with literal %q\n", node.Text, literalValue)
 		return NewLiteral(literalValue), nil
 	})
 
@@ -472,19 +475,25 @@ func createRuleVisitor(
 			return nil, fmt.Errorf("rules: %w", err)
 		}
 
+		var knownRuleNames []string
 		rulesMap := make(map[string]Expression)
 		for _, rule := range rules {
-			rulesMap[rule.ExprName()] = rule
+			ruleName := rule.ExprName()
+
+			rulesMap[ruleName] = rule
+			knownRuleNames = append(knownRuleNames, ruleName)
 		}
 		for _, rule := range customRules {
-			rulesMap[rule.ExprName()] = rule
-		}
-		for k, v := range rulesMap {
-			withResolveRefs, ok := v.(WithResolveRefs)
-			if !ok {
-				continue
+			ruleName := rule.ExprName()
+			if _, ok := rulesMap[ruleName]; !ok {
+				knownRuleNames = append(knownRuleNames, ruleName)
 			}
-			resolved, err := withResolveRefs.ResolveRefs(rulesMap)
+			rulesMap[ruleName] = rule
+		}
+		for _, k := range knownRuleNames {
+			v := rulesMap[k]
+			// debugf("resolving refs for %q (known rule names: %q)\n", k, knownRuleNames)
+			resolved, err := resolveRefsFor(v, rulesMap)
 			if err != nil {
 				return nil, fmt.Errorf("resolve refs for %q: %w", k, err)
 			}

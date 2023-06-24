@@ -170,14 +170,14 @@ func ParseWithExpression(expr Expression, text string, pos int) (*Node, error) {
 	return node, nil
 }
 
-type WithResolveRefs interface {
+type withResolveRefs interface {
 	Expression
 
 	ResolveRefs(rules map[string]Expression) (Expression, error)
 }
 
 func resolveRefsFor(v Expression, rules map[string]Expression) (Expression, error) {
-	expr, ok := v.(WithResolveRefs)
+	expr, ok := v.(withResolveRefs)
 	if !ok {
 		return v, nil
 	}
@@ -331,7 +331,7 @@ type Sequence struct {
 
 var _ Expression = (*Sequence)(nil)
 var _ exprImpl = (*Sequence)(nil)
-var _ WithResolveRefs = (*Sequence)(nil)
+var _ withResolveRefs = (*Sequence)(nil)
 
 func NewSequence(name string, members []Expression) *Sequence {
 	rv := &Sequence{
@@ -404,7 +404,7 @@ type OneOf struct {
 
 var _ Expression = (*OneOf)(nil)
 var _ exprImpl = (*OneOf)(nil)
-var _ WithResolveRefs = (*OneOf)(nil)
+var _ withResolveRefs = (*OneOf)(nil)
 
 func NewOneOf(name string, members []Expression) *OneOf {
 	rv := &OneOf{
@@ -473,7 +473,7 @@ type Lookahead struct {
 
 var _ Expression = (*Lookahead)(nil)
 var _ exprImpl = (*Lookahead)(nil)
-var _ WithResolveRefs = (*Lookahead)(nil)
+var _ withResolveRefs = (*Lookahead)(nil)
 
 func NewLookahead(name string, member Expression, negative bool) *Lookahead {
 	rv := &Lookahead{
@@ -555,7 +555,7 @@ type Quantifier struct {
 
 var _ Expression = (*Quantifier)(nil)
 var _ exprImpl = (*Quantifier)(nil)
-var _ WithResolveRefs = (*Quantifier)(nil)
+var _ withResolveRefs = (*Quantifier)(nil)
 
 func newQuantifier(name string, member Expression, min float64, max float64) *Quantifier {
 	rv := &Quantifier{
@@ -716,7 +716,7 @@ type LazyReference struct {
 
 var _ Expression = (*LazyReference)(nil)
 var _ exprImpl = (*LazyReference)(nil)
-var _ WithResolveRefs = (*LazyReference)(nil)
+var _ withResolveRefs = (*LazyReference)(nil)
 
 func NewLazyReference(referenceName string) *LazyReference {
 	rv := &LazyReference{

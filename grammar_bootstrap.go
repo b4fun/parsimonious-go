@@ -480,11 +480,7 @@ func createRuleVisitor(
 			rulesMap[rule.ExprName()] = rule
 		}
 		for k, v := range rulesMap {
-			withResolveRefs, ok := v.(WithResolveRefs)
-			if !ok {
-				continue
-			}
-			resolved, err := withResolveRefs.ResolveRefs(rulesMap)
+			resolved, err := resolveRefsFor(v, rulesMap)
 			if err != nil {
 				return nil, fmt.Errorf("resolve refs for %q: %w", k, err)
 			}

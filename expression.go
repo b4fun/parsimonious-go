@@ -632,7 +632,7 @@ func (q *Quantifier) identity() []byte {
 func (q *Quantifier) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {
 	curPos := parseOpts.pos
 	children := make([]*Node, 0)
-	size := len(text)
+	size := utf8.RuneCountInString(text)
 	for curPos < size && float64(len(children)) < q.max {
 		matchResult := q.member.matchWithCache(text, parseOpts.withPos(curPos), cache)
 		if matchResult.isMatchFailed() {
@@ -642,8 +642,14 @@ func (q *Quantifier) uncachedMatch(text string, parseOpts *ParseOptions, cache n
 			break
 		}
 		node := matchResult.Node
+		//parseOpts.debugf("[%s] matched new node: %s %q\n", q, node, node.Text)
 		children = append(children, node)
-		curPos += node.End - node.Start
+		nodeMatchedLength := node.End - node.Start
+		if nodeMatchedLength == 0 && float64(len(children)) >= q.min {
+			// This is a zero-length match (lookahead), so we need to advance the cursor after reaching minimum
+			break
+		}
+		curPos += nodeMatchedLength
 	}
 
 	if float64(len(children)) < q.min {

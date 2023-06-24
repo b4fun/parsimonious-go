@@ -36,9 +36,9 @@ func Test_evalPythonStringValue(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name: "unicode string",
-			in:  `"你好世界👨‍👩‍👦"`,
-			out: "你好世界👨‍👩‍👦",
+			name:      "unicode string",
+			in:        `"你好世界👨‍👩‍👦"`,
+			out:       "你好世界👨‍👩‍👦",
 			expectErr: false,
 		},
 		{
@@ -48,7 +48,6 @@ func Test_evalPythonStringValue(t *testing.T) {
 			expectErr: false,
 		},
 	}
-
 
 	for idx := range cases {
 		c := cases[idx]

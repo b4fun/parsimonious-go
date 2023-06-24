@@ -475,14 +475,24 @@ func createRuleVisitor(
 			return nil, fmt.Errorf("rules: %w", err)
 		}
 
+		var knownRuleNames []string
 		rulesMap := make(map[string]Expression)
 		for _, rule := range rules {
-			rulesMap[rule.ExprName()] = rule
+			ruleName := rule.ExprName()
+
+			rulesMap[ruleName] = rule
+			knownRuleNames = append(knownRuleNames, ruleName)
 		}
 		for _, rule := range customRules {
-			rulesMap[rule.ExprName()] = rule
+			ruleName := rule.ExprName()
+			if _, ok := rulesMap[ruleName]; !ok {
+				knownRuleNames = append(knownRuleNames, ruleName)
+			}
+			rulesMap[ruleName] = rule
 		}
-		for k, v := range rulesMap {
+		for _, k := range knownRuleNames {
+			v := rulesMap[k]
+			// debugf("resolving refs for %q (known rule names: %q)\n", k, knownRuleNames)
 			resolved, err := resolveRefsFor(v, rulesMap)
 			if err != nil {
 				return nil, fmt.Errorf("resolve refs for %q: %w", k, err)

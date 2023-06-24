@@ -141,12 +141,18 @@ func joinExpressionsAsRule(exprs []Expression, sep string) string {
 type Expression interface {
 	fmt.Stringer
 
+	// ExprName returns the name of the expression.
 	ExprName() string
-	SetExprName(string) // TODO: maybe we should get rid of this?
+	// SetExprName sets the name of the expression.
+	// TODO: maybe we should get rid of this?
+	SetExprName(string)
+	// Match matches the expression against the given text at the given rune position.
 	Match(text string, pos int) (*Node, error)
 
+	// matchWithCache matches the expression against the given text at the given rune position. (internal usage)
 	matchWithCache(text string, pos int, cache nodeCache) *matchResult
-	hash() uint64 // for caching
+	// hash returns a hash value for the expression. (internal usage)
+	hash() uint64
 }
 
 func ParseWithExpression(expr Expression, text string, pos int) (*Node, error) {

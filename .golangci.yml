@@ -1,0 +1,19 @@
+linters:
+  disable-all: true
+  enable:
+  - lll
+  - gofmt
+  - unused
+  - goimports
+  - ineffassign
+  - misspell
+  - errcheck
+  - gosec
+  - govet
+  - nonamedreturns
+  - reassign
+
+output:
+  print-issued-lines: true
+  sort-results: true
+  format: github-actions

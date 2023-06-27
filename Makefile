@@ -31,6 +31,10 @@ test-src:
 test-samples:
 	$(call run-in-folder, samples, go test -v ./...)
 
+.PHONY: lint
+lint: ## Lint go code
+	golangci-lint -v run ./...
+
 .PHONY: fmt
 fmt: ## Run go fmt
 	go fmt ./...	

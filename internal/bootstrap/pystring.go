@@ -1,35 +1,22 @@
-package parsimonious
+package bootstrap
 
 import (
 	"fmt"
 
+	"github.com/b4fun/parsimonious-go/nodes"
+	"github.com/b4fun/parsimonious-go/types"
 	"github.com/dlclark/regexp2"
 )
 
-func sliceStringAsRuneSlice(s string, from, to int) string {
-	switch {
-	case from < 0 && to < 0:
-		return s
-	case from < 0 && to >= 0:
-		return string([]rune(s)[:to])
-	case from >= 0 && to < 0:
-		return string([]rune(s)[from:])
-	case from >= 0 && to >= 0:
-		return string([]rune(s)[from:to])
-	default:
-		panic(fmt.Sprintf("invalid sliceStringAsRuneSlice: %d, %d", from, to))
-	}
-}
-
-var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux) {
-	doubleQuotedCharacters := NewRegex(
+var pythonStringExpr, pythonStringVisitor = func() (types.Expression, *nodes.NodeVisitorMux) {
+	doubleQuotedCharacters := types.NewRegex(
 		"",
 		regexp2.MustCompile(
 			`[^"\\]*(?:\\.[^"\\]*)*`,
 			regexp2.RE2|regexp2.Singleline|regexp2.Unicode,
 		),
 	)
-	singleQuotedCharacters := NewRegex(
+	singleQuotedCharacters := types.NewRegex(
 		"",
 		regexp2.MustCompile(
 			`[^'\\]*(?:\\.[^'\\]*)*`,
@@ -37,47 +24,55 @@ var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux)
 		),
 	)
 
-	doubleQuoted := NewSequence(
+	doubleQuoted := types.NewSequence(
 		"double_quoted",
-		[]Expression{
-			NewLiteral("\""),
+		[]types.Expression{
+			types.NewLiteral("\""),
 			doubleQuotedCharacters,
-			NewLiteral("\""),
+			types.NewLiteral("\""),
 		},
 	)
 
-	singleQuoted := NewSequence(
+	singleQuoted := types.NewSequence(
 		"single_quoted",
-		[]Expression{
-			NewLiteral("'"),
+		[]types.Expression{
+			types.NewLiteral("'"),
 			singleQuotedCharacters,
-			NewLiteral("'"),
+			types.NewLiteral("'"),
 		},
 	)
 
-	rawStringDoubleQuoted := NewSequence(
+	representPrefix := types.NewOneOf(
+		"",
+		[]types.Expression{
+			types.NewLiteral("r"),
+			types.NewLiteral("R"),
+		},
+	)
+
+	rawStringDoubleQuoted := types.NewSequence(
 		"raw_string_double_quoted",
-		[]Expression{
-			NewOneOf("", []Expression{NewLiteral("r"), NewLiteral("R")}),
-			NewLiteral("\""),
+		[]types.Expression{
+			representPrefix,
+			types.NewLiteral("\""),
 			doubleQuotedCharacters,
-			NewLiteral("\""),
+			types.NewLiteral("\""),
 		},
 	)
 
-	rawStringSingleQuoted := NewSequence(
+	rawStringSingleQuoted := types.NewSequence(
 		"raw_string_single_quoted",
-		[]Expression{
-			NewOneOf("", []Expression{NewLiteral("r"), NewLiteral("R")}),
-			NewLiteral("'"),
+		[]types.Expression{
+			representPrefix,
+			types.NewLiteral("'"),
 			singleQuotedCharacters,
-			NewLiteral("'"),
+			types.NewLiteral("'"),
 		},
 	)
 
-	stringValue := NewOneOf(
+	stringValue := types.NewOneOf(
 		"string_value",
-		[]Expression{
+		[]types.Expression{
 			doubleQuoted,
 			singleQuoted,
 			rawStringDoubleQuoted,
@@ -85,7 +80,7 @@ var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux)
 		},
 	)
 
-	visitQuoted := func(node *Node, children []any) (any, error) {
+	visitQuoted := func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 3); err != nil {
 			return nil, err
 		}
@@ -99,7 +94,7 @@ var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux)
 		return rv, nil
 	}
 
-	visitRawString := func(node *Node, children []any) (any, error) {
+	visitRawString := func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 4); err != nil {
 			return nil, err
 		}
@@ -113,7 +108,7 @@ var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux)
 		return rv, nil
 	}
 
-	visitStringValue := func(node *Node, children []any) (any, error) {
+	visitStringValue := func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 1); err != nil {
 			return nil, err
 		}
@@ -121,7 +116,7 @@ var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux)
 		return children[0], nil
 	}
 
-	mux := NewNodeVisitorMux().
+	mux := nodes.NewNodeVisitorMux().
 		HandleExpr("single_quoted", visitQuoted).
 		HandleExpr("double_quoted", visitQuoted).
 		HandleExpr("raw_string_double_quoted", visitRawString).
@@ -132,7 +127,7 @@ var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux)
 }()
 
 func evalPythonStringValue(input string) (string, error) {
-	tree, err := ParseWithExpression(pythonStringExpr, input)
+	tree, err := types.ParseWithExpression(pythonStringExpr, input)
 	if err != nil {
 		return "", err
 	}

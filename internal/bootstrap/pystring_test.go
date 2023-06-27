@@ -1,4 +1,4 @@
-package parsimonious
+package bootstrap
 
 import (
 	"testing"

@@ -1,4 +1,4 @@
-package parsimonious
+package types
 
 import (
 	"fmt"
@@ -168,7 +168,7 @@ func (opts *ParseOptions) withPos(newPos int) *ParseOptions {
 	}
 }
 
-func (opts *ParseOptions) debugf(format string, args ...interface{}) {
+func (opts *ParseOptions) debugf(format string, args ...interface{}) { //nolint:unused
 	if opts.debug {
 		fmt.Printf(format, args...)
 	}
@@ -216,7 +216,7 @@ type withResolveRefs interface {
 	ResolveRefs(rules map[string]Expression) (Expression, error)
 }
 
-func resolveRefsFor(v Expression, rules map[string]Expression) (Expression, error) {
+func ResolveRefsFor(v Expression, rules map[string]Expression) (Expression, error) {
 	expr, ok := v.(withResolveRefs)
 	if !ok {
 		return v, nil
@@ -228,7 +228,7 @@ func resolveRefsFor(v Expression, rules map[string]Expression) (Expression, erro
 func resolveRefsForMany(vs []Expression, rules map[string]Expression) ([]Expression, error) {
 	var resolved []Expression
 	for _, v := range vs {
-		expr, err := resolveRefsFor(v, rules)
+		expr, err := ResolveRefsFor(v, rules)
 		if err != nil {
 			return nil, err
 		}
@@ -328,6 +328,10 @@ func NewLiteralWithName(name string, literal string) *Literal {
 
 func NewLiteral(literal string) *Literal {
 	return NewLiteralWithName("", literal)
+}
+
+func (l *Literal) GetLiteral() string {
+	return l.literal
 }
 
 func (l *Literal) exprName() string {
@@ -457,6 +461,10 @@ func NewOneOf(name string, members []Expression) *OneOf {
 	return rv
 }
 
+func (of *OneOf) SetMembers(members []Expression) {
+	of.members = members
+}
+
 func (of *OneOf) exprName() string {
 	return of.name
 }
@@ -561,7 +569,7 @@ func (l *Lookahead) uncachedMatch(text string, parseOpts *ParseOptions, cache no
 }
 
 func (l *Lookahead) ResolveRefs(refs map[string]Expression) (Expression, error) {
-	newMember, err := resolveRefsFor(l.member, refs)
+	newMember, err := ResolveRefsFor(l.member, refs)
 	if err != nil {
 		return nil, err
 	}
@@ -667,7 +675,7 @@ func (q *Quantifier) uncachedMatch(text string, parseOpts *ParseOptions, cache n
 }
 
 func (q *Quantifier) ResolveRefs(refs map[string]Expression) (Expression, error) {
-	newMember, err := resolveRefsFor(q.member, refs)
+	newMember, err := ResolveRefsFor(q.member, refs)
 	if err != nil {
 		return nil, err
 	}

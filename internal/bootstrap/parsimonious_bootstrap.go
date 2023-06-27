@@ -1,196 +1,159 @@
-package parsimonious
+package bootstrap
 
 import (
 	"fmt"
 	"strings"
 
+	"github.com/b4fun/parsimonious-go/nodes"
+	"github.com/b4fun/parsimonious-go/types"
 	"github.com/dlclark/regexp2"
 )
 
-// ruleSyntax is the syntax of the parsimonious grammar.
-const ruleSyntax = `
-# Ignored things (represented by _) are typically hung off the end of the
-# leafmost kinds of nodes. Literals like "/" count as leaves.
-
-rules = _ rule*
-rule = label equals expression
-equals = "=" _
-literal = spaceless_literal _
-
-# FIXME(hbc): invalid regex
-# spaceless_literal = ~"r?\"[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*\""is /
-# 					  ~"r?'[^'\\\\]*(?:\\\\.[^'\\\\]*)*'"is
-
-expression = ored / sequence / term
-or_term = "/" _ term
-ored = term or_term+
-sequence = term term+
-not_term = "!" term _
-lookahead_term = "&" term _
-term = not_term / lookahead_term / quantified / atom
-quantified = atom quantifier
-atom = reference / literal / regex / parenthesized
-regex = "~" spaceless_literal ~"[ilmsuxa]*"i _
-parenthesized = "(" _ expression ")" _
-quantifier = ~r"[*+?]|\{\d*,\d+\}|\{\d+,\d*\}|\{\d+\}" _
-reference = label !equals
-
-# A subsequent equal sign is the only thing that distinguishes a label
-# (which begins a new rule) from a reference (which is just a pointer to a
-# rule defined somewhere else):
-label = ~"[a-zA-Z_][a-zA-Z_0-9]*(?![\"'])" _
-
-# _ = ~"\\s*(?:#[^\\r\\n]*)?\\s*"
-_ = meaninglessness*
-meaninglessness = ~r"\s+" / comment
-comment = ~r"#[^\r\n]*"
-`
-
 // createBootstrapRules returns the bootstrap rules for the parsimonious grammar.
-func createBootstrapRules() Expression {
-	comment := NewRegex(
+func createBootstrapRules() types.Expression {
+	comment := types.NewRegex(
 		"comment",
 		regexp2.MustCompile("^#[^\r\n]*", regexp2.RE2),
 	)
-	meaninglessness := NewOneOf(
+	meaninglessness := types.NewOneOf(
 		"meaninglessness",
-		[]Expression{
-			NewRegex("", regexp2.MustCompile(`^\s+`, regexp2.RE2)),
+		[]types.Expression{
+			types.NewRegex("", regexp2.MustCompile(`^\s+`, regexp2.RE2)),
 			comment,
 		},
 	)
-	underscore := NewZeroOrMore(
+	underscore := types.NewZeroOrMore(
 		"_",
 		meaninglessness,
 	)
-	equals := NewSequence(
+	equals := types.NewSequence(
 		"equals",
-		[]Expression{
-			NewLiteral("="),
+		[]types.Expression{
+			types.NewLiteral("="),
 			underscore,
 		},
 	)
-	label := NewSequence(
+	label := types.NewSequence(
 		"label",
-		[]Expression{
-			NewRegex("", regexp2.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`, regexp2.RE2)),
+		[]types.Expression{
+			types.NewRegex("", regexp2.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`, regexp2.RE2)),
 			underscore,
 		},
 	)
-	reference := NewSequence(
+	reference := types.NewSequence(
 		"reference",
-		[]Expression{
+		[]types.Expression{
 			label,
-			NewNot(equals),
+			types.NewNot(equals),
 		},
 	)
-	quantifier := NewSequence(
+	quantifier := types.NewSequence(
 		"quantifier",
-		[]Expression{
-			NewRegex("", regexp2.MustCompile(`^[*+?]`, regexp2.RE2)),
+		[]types.Expression{
+			types.NewRegex("", regexp2.MustCompile(`^[*+?]`, regexp2.RE2)),
 			underscore,
 		},
 	)
-	spacelessLiteral := NewRegex(
+	spacelessLiteral := types.NewRegex(
 		"spaceless_literal",
 		regexp2.MustCompile(`(?si)^r?"[^"\\]*(?:\\.[^"\\]*)*"`, regexp2.RE2),
 	)
-	literal := NewSequence(
+	literal := types.NewSequence(
 		"literal",
-		[]Expression{
+		[]types.Expression{
 			spacelessLiteral,
 			underscore,
 		},
 	)
-	regex := NewSequence(
+	regex := types.NewSequence(
 		"regex",
-		[]Expression{
-			NewLiteral("~"),
+		[]types.Expression{
+			types.NewLiteral("~"),
 			literal,
-			NewRegex("", regexp2.MustCompile(`^[ilmsuxa]*`, regexp2.RE2|regexp2.IgnoreCase)),
+			types.NewRegex("", regexp2.MustCompile(`^[ilmsuxa]*`, regexp2.RE2|regexp2.IgnoreCase)),
 			underscore,
 		},
 	)
-	atom := NewOneOf(
+	atom := types.NewOneOf(
 		"atom",
-		[]Expression{
+		[]types.Expression{
 			reference,
 			literal,
 			regex,
 		},
 	)
-	quantified := NewSequence(
+	quantified := types.NewSequence(
 		"quantified",
-		[]Expression{
+		[]types.Expression{
 			atom,
 			quantifier,
 		},
 	)
 
-	term := NewOneOf(
+	term := types.NewOneOf(
 		"term",
-		[]Expression{
+		[]types.Expression{
 			quantified,
 			atom,
 		},
 	)
-	notTerm := NewSequence(
+	notTerm := types.NewSequence(
 		"not_term",
-		[]Expression{
-			NewLiteral("!"),
+		[]types.Expression{
+			types.NewLiteral("!"),
 			term,
 			underscore,
 		},
 	)
-	term.members = []Expression{
+	term.SetMembers([]types.Expression{
 		notTerm,
 		quantified,
 		atom,
-	}
+	})
 
-	sequence := NewSequence(
+	sequence := types.NewSequence(
 		"sequence",
-		[]Expression{
+		[]types.Expression{
 			term,
-			NewOneOrMore("", term),
+			types.NewOneOrMore("", term),
 		},
 	)
-	orTerm := NewSequence(
+	orTerm := types.NewSequence(
 		"or_term",
-		[]Expression{
-			NewLiteral("/"),
+		[]types.Expression{
+			types.NewLiteral("/"),
 			underscore,
 			term,
 		},
 	)
-	ored := NewSequence(
+	ored := types.NewSequence(
 		"ored",
-		[]Expression{
+		[]types.Expression{
 			term,
-			NewOneOrMore("", orTerm),
+			types.NewOneOrMore("", orTerm),
 		},
 	)
-	expression := NewOneOf(
+	expression := types.NewOneOf(
 		"expression",
-		[]Expression{
+		[]types.Expression{
 			ored,
 			sequence,
 			term,
 		},
 	)
-	rule := NewSequence(
+	rule := types.NewSequence(
 		"rule",
-		[]Expression{
+		[]types.Expression{
 			label,
 			equals,
 			expression,
 		},
 	)
-	rules := NewSequence(
+	rules := types.NewSequence(
 		"rules",
-		[]Expression{
+		[]types.Expression{
 			underscore,
-			NewOneOrMore("", rule),
+			types.NewOneOrMore("", rule),
 		},
 	)
 
@@ -200,16 +163,16 @@ func createBootstrapRules() Expression {
 // createRuleVisitor creates a node visitor for the parsimonious grammar rules.
 func createRuleVisitor(
 	debug bool,
-	customRules []Expression,
-) *NodeVisitorMux {
+	customRules []types.Expression,
+) *nodes.NodeVisitorMux {
 	debugf := func(s string, args ...any) {
 		if debug {
 			fmt.Printf("[rule visitor] "+s, args...)
 		}
 	}
 
-	debugVisitWithChildren := func(f NodeVisitWithChildrenFunc) NodeVisitWithChildrenFunc {
-		return func(node *Node, children []any) (any, error) {
+	debugHandleExpr := func(f nodes.NodeVisitFunc) nodes.NodeVisitFunc {
+		return func(node *types.Node, children []any) (any, error) {
 			debugf(
 				"[%s visitor] visiting %s with children (count=%d)\n",
 				node.Expression.ExprName(), node, len(children),
@@ -219,19 +182,16 @@ func createRuleVisitor(
 		}
 	}
 
-	defaultVisitor := VisitWithChildren(func(node *Node, children []any) (any, error) {
+	defaultVisitorWithDebug := func(node *types.Node, children []any) (any, error) {
 		debugf(
 			"[default visitor] visiting <Node: %s start:%d, end:%d> with children (count=%d)\n",
 			node.Expression, node.Start, node.End, len(children),
 		)
 
-		if len(children) > 0 {
-			return children, nil
-		}
-		return node, nil
-	})
+		return nodes.DefaultNodeVisitor(node, children)
+	}
 
-	liftChild := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	liftChild := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if len(children) < 1 {
 			return nil, fmt.Errorf("%s should have at least one child", node)
 		}
@@ -239,7 +199,7 @@ func createRuleVisitor(
 		return children[0], nil
 	})
 
-	visitParenthesized := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitParenthesized := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 5); err != nil {
 			return nil, err
 		}
@@ -252,7 +212,7 @@ func createRuleVisitor(
 		return expression, nil
 	})
 
-	visitQuantifier := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitQuantifier := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -261,7 +221,7 @@ func createRuleVisitor(
 		return symbol, nil
 	})
 
-	visitQuantified := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitQuantified := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -277,18 +237,18 @@ func createRuleVisitor(
 
 		switch t := quantifier.Text; t {
 		case "?":
-			return NewOptional("", atom), nil
+			return types.NewOptional("", atom), nil
 		case "*":
-			return NewZeroOrMore("", atom), nil
+			return types.NewZeroOrMore("", atom), nil
 		case "+":
-			return NewOneOrMore("", atom), nil
+			return types.NewOneOrMore("", atom), nil
 		default:
 			// TODO: support quantifiers like {1,2}
 			return nil, fmt.Errorf("TODO: support quantifier %q", t)
 		}
 	})
 
-	visitLookaheadTerm := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitLookaheadTerm := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 3); err != nil {
 			return nil, err
 		}
@@ -298,10 +258,10 @@ func createRuleVisitor(
 			return nil, fmt.Errorf("lookahead_term: %w", err)
 		}
 
-		return NewLookahead("", term, false), nil
+		return types.NewLookahead("", term, false), nil
 	})
 
-	visitNotTerm := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitNotTerm := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 3); err != nil {
 			return nil, err
 		}
@@ -311,10 +271,10 @@ func createRuleVisitor(
 			return nil, fmt.Errorf("not_term: %w", err)
 		}
 
-		return NewNot(term), nil
+		return types.NewNot(term), nil
 	})
 
-	visitRule := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitRule := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 3); err != nil {
 			return nil, err
 		}
@@ -334,7 +294,7 @@ func createRuleVisitor(
 		return expression, nil
 	})
 
-	visitSequence := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitSequence := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -348,12 +308,12 @@ func createRuleVisitor(
 			return nil, fmt.Errorf("sequence: %w", err)
 		}
 
-		sequenceMembers := append([]Expression{term}, otherTerms...)
+		sequenceMembers := append([]types.Expression{term}, otherTerms...)
 		debugf("creating sequence members with length %d\n", len(sequenceMembers))
-		return NewSequence("", sequenceMembers), nil
+		return types.NewSequence("", sequenceMembers), nil
 	})
 
-	visitOred := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitOred := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -367,12 +327,12 @@ func createRuleVisitor(
 			return nil, fmt.Errorf("ored: %w", err)
 		}
 
-		terms := append([]Expression{firstTerm}, otherTerms...)
+		terms := append([]types.Expression{firstTerm}, otherTerms...)
 		debugf("creating oneOf members with length %d\n", len(terms))
-		return NewOneOf("", terms), nil
+		return types.NewOneOf("", terms), nil
 	})
 
-	visitOrTerm := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitOrTerm := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 3); err != nil {
 			return nil, err
 		}
@@ -381,7 +341,7 @@ func createRuleVisitor(
 	})
 
 	// FIXME: this visitor is returning non expression value, which makes us to fallback to any :(
-	visitLabel := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitLabel := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -393,7 +353,7 @@ func createRuleVisitor(
 		return labelName, nil
 	})
 
-	visitReference := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitReference := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -402,19 +362,19 @@ func createRuleVisitor(
 		if err != nil {
 			return nil, err
 		}
-		return NewLazyReference(label.Text), nil
+		return types.NewLazyReference(label.Text), nil
 	})
 
-	visitRegex := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitRegex := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 4); err != nil {
 			return nil, err
 		}
 
-		literal, err := shouldCastAsExpressionWithType[*Literal](children[1])
+		literal, err := shouldCastAsExpressionWithType[*types.Literal](children[1])
 		if err != nil {
 			return nil, fmt.Errorf("regex (literal): %w", err)
 		}
-		pattern := "^" + literal.literal
+		pattern := "^" + literal.GetLiteral()
 
 		var reOptions regexp2.RegexOptions = regexp2.Unicode
 		flags, err := shouldCastAsNode(children[2])
@@ -441,10 +401,10 @@ func createRuleVisitor(
 		}
 
 		debugf("regex pattern: %q, flags: %q\n", pattern, flagsText)
-		return NewRegex("", re), nil
+		return types.NewRegex("", re), nil
 	})
 
-	visitSpacelessLiteral := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitSpacelessLiteral := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		//debugf("spaceless literal: %q\n", node.Text)
 		literalValue, err := evalPythonStringValue(node.Text)
 		if err != nil {
@@ -453,10 +413,10 @@ func createRuleVisitor(
 		}
 
 		//debugf("spaceless literal %q matched with literal %q\n", node.Text, literalValue)
-		return NewLiteral(literalValue), nil
+		return types.NewLiteral(literalValue), nil
 	})
 
-	visitLiteral := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitLiteral := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -465,7 +425,7 @@ func createRuleVisitor(
 	})
 
 	// FIXME: this visitor is returning non expression value, which makes us to fallback to any :(
-	visitRules := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitRules := debugHandleExpr(func(node *types.Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -476,7 +436,7 @@ func createRuleVisitor(
 		}
 
 		var knownRuleNames []string
-		rulesMap := make(map[string]Expression)
+		rulesMap := make(map[string]types.Expression)
 		for _, rule := range rules {
 			ruleName := rule.ExprName()
 
@@ -493,41 +453,39 @@ func createRuleVisitor(
 		for _, k := range knownRuleNames {
 			v := rulesMap[k]
 			// debugf("resolving refs for %q (known rule names: %q)\n", k, knownRuleNames)
-			resolved, err := resolveRefsFor(v, rulesMap)
+			resolved, err := types.ResolveRefsFor(v, rulesMap)
 			if err != nil {
 				return nil, fmt.Errorf("resolve refs for %q: %w", k, err)
 			}
 			rulesMap[k] = resolved
 		}
 
-		rv := &Grammar{
-			rules:       rulesMap,
-			defaultRule: rulesMap[rules[0].ExprName()],
-		}
-		debugf("loaded %d rules, default rule: %s\n", len(rv.rules), rv.defaultRule)
+		defaultRule := rulesMap[rules[0].ExprName()]
+		rv := types.NewGrammar(rulesMap, defaultRule)
+		debugf("loaded %d rules, default rule: %s\n", len(rulesMap), defaultRule)
 
 		return rv, nil
 	})
 
-	mux := NewNodeVisitorMux(defaultVisitor).
-		VisitWithChildren("expression", liftChild).
-		VisitWithChildren("term", liftChild).
-		VisitWithChildren("atom", liftChild).
-		VisitWithChildren("parenthesized", visitParenthesized).
-		VisitWithChildren("quantifier", visitQuantifier).
-		VisitWithChildren("quantified", visitQuantified).
-		VisitWithChildren("lookahead_term", visitLookaheadTerm).
-		VisitWithChildren("not_term", visitNotTerm).
-		VisitWithChildren("rule", visitRule).
-		VisitWithChildren("sequence", visitSequence).
-		VisitWithChildren("ored", visitOred).
-		VisitWithChildren("or_term", visitOrTerm).
-		VisitWithChildren("label", visitLabel).
-		VisitWithChildren("reference", visitReference).
-		VisitWithChildren("regex", visitRegex).
-		VisitWithChildren("spaceless_literal", visitSpacelessLiteral).
-		VisitWithChildren("literal", visitLiteral).
-		VisitWithChildren("rules", visitRules)
+	mux := nodes.NewNodeVisitorMux(nodes.WithDefaultNodeVisitFunc(defaultVisitorWithDebug)).
+		HandleExpr("expression", liftChild).
+		HandleExpr("term", liftChild).
+		HandleExpr("atom", liftChild).
+		HandleExpr("parenthesized", visitParenthesized).
+		HandleExpr("quantifier", visitQuantifier).
+		HandleExpr("quantified", visitQuantified).
+		HandleExpr("lookahead_term", visitLookaheadTerm).
+		HandleExpr("not_term", visitNotTerm).
+		HandleExpr("rule", visitRule).
+		HandleExpr("sequence", visitSequence).
+		HandleExpr("ored", visitOred).
+		HandleExpr("or_term", visitOrTerm).
+		HandleExpr("label", visitLabel).
+		HandleExpr("reference", visitReference).
+		HandleExpr("regex", visitRegex).
+		HandleExpr("spaceless_literal", visitSpacelessLiteral).
+		HandleExpr("literal", visitLiteral).
+		HandleExpr("rules", visitRules)
 
 	return mux
 }

@@ -6,10 +6,9 @@
 
 ## TODO
 
-- [ ] fine tune visitor interfaces
 - [ ] fix `spacelss_literal` parsing rule
 - [ ] friendly error 
-- [ ] benchmark
+- [ ] benchmark & unit tests
 
 ## LICENSE
 

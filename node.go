@@ -95,7 +95,7 @@ func DefaultNodeVisitor(node *Node, children []any) (any, error) {
 }
 
 // NewNodeVisitorMux creates a NodeVisitorMux instance.
-func NewNodeVisitorMux(opts... NodeVisitorMuxOpt) *NodeVisitorMux {
+func NewNodeVisitorMux(opts ...NodeVisitorMuxOpt) *NodeVisitorMux {
 	rv := &NodeVisitorMux{
 		visitors:     make(map[string]NodeVisitFunc),
 		defaultVisit: DefaultNodeVisitor,
@@ -127,13 +127,13 @@ func (mux *NodeVisitorMux) Visit(node *Node) (any, error) {
 	}
 
 	children := make([]any, 0, len(node.Children))
-		for _, child := range node.Children {
-			c, err := mux.Visit(child)
-			if err != nil {
-				return nil, err
-			}
-			children = append(children, c)
+	for _, child := range node.Children {
+		c, err := mux.Visit(child)
+		if err != nil {
+			return nil, err
 		}
+		children = append(children, c)
+	}
 
 	return visitor(node, children)
 }

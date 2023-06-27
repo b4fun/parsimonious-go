@@ -208,7 +208,7 @@ func createRuleVisitor(
 		}
 	}
 
-	debugVisitWithChildren := func(f NodeVisitWithChildrenFunc) NodeVisitWithChildrenFunc {
+	debugHandleExpr := func(f NodeVisitFunc) NodeVisitFunc {
 		return func(node *Node, children []any) (any, error) {
 			debugf(
 				"[%s visitor] visiting %s with children (count=%d)\n",
@@ -219,19 +219,16 @@ func createRuleVisitor(
 		}
 	}
 
-	defaultVisitor := VisitWithChildren(func(node *Node, children []any) (any, error) {
+	defaultVisitorWithDebug := func(node *Node, children []any) (any, error) {
 		debugf(
 			"[default visitor] visiting <Node: %s start:%d, end:%d> with children (count=%d)\n",
 			node.Expression, node.Start, node.End, len(children),
 		)
 
-		if len(children) > 0 {
-			return children, nil
-		}
-		return node, nil
-	})
+		return DefaultNodeVisitor(node, children)
+	}
 
-	liftChild := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	liftChild := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if len(children) < 1 {
 			return nil, fmt.Errorf("%s should have at least one child", node)
 		}
@@ -239,7 +236,7 @@ func createRuleVisitor(
 		return children[0], nil
 	})
 
-	visitParenthesized := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitParenthesized := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 5); err != nil {
 			return nil, err
 		}
@@ -252,7 +249,7 @@ func createRuleVisitor(
 		return expression, nil
 	})
 
-	visitQuantifier := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitQuantifier := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -261,7 +258,7 @@ func createRuleVisitor(
 		return symbol, nil
 	})
 
-	visitQuantified := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitQuantified := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -288,7 +285,7 @@ func createRuleVisitor(
 		}
 	})
 
-	visitLookaheadTerm := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitLookaheadTerm := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 3); err != nil {
 			return nil, err
 		}
@@ -301,7 +298,7 @@ func createRuleVisitor(
 		return NewLookahead("", term, false), nil
 	})
 
-	visitNotTerm := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitNotTerm := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 3); err != nil {
 			return nil, err
 		}
@@ -314,7 +311,7 @@ func createRuleVisitor(
 		return NewNot(term), nil
 	})
 
-	visitRule := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitRule := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 3); err != nil {
 			return nil, err
 		}
@@ -334,7 +331,7 @@ func createRuleVisitor(
 		return expression, nil
 	})
 
-	visitSequence := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitSequence := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -353,7 +350,7 @@ func createRuleVisitor(
 		return NewSequence("", sequenceMembers), nil
 	})
 
-	visitOred := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitOred := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -372,7 +369,7 @@ func createRuleVisitor(
 		return NewOneOf("", terms), nil
 	})
 
-	visitOrTerm := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitOrTerm := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 3); err != nil {
 			return nil, err
 		}
@@ -381,7 +378,7 @@ func createRuleVisitor(
 	})
 
 	// FIXME: this visitor is returning non expression value, which makes us to fallback to any :(
-	visitLabel := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitLabel := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -393,7 +390,7 @@ func createRuleVisitor(
 		return labelName, nil
 	})
 
-	visitReference := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitReference := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -405,7 +402,7 @@ func createRuleVisitor(
 		return NewLazyReference(label.Text), nil
 	})
 
-	visitRegex := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitRegex := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 4); err != nil {
 			return nil, err
 		}
@@ -444,7 +441,7 @@ func createRuleVisitor(
 		return NewRegex("", re), nil
 	})
 
-	visitSpacelessLiteral := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitSpacelessLiteral := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		//debugf("spaceless literal: %q\n", node.Text)
 		literalValue, err := evalPythonStringValue(node.Text)
 		if err != nil {
@@ -456,7 +453,7 @@ func createRuleVisitor(
 		return NewLiteral(literalValue), nil
 	})
 
-	visitLiteral := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitLiteral := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -465,7 +462,7 @@ func createRuleVisitor(
 	})
 
 	// FIXME: this visitor is returning non expression value, which makes us to fallback to any :(
-	visitRules := debugVisitWithChildren(func(node *Node, children []any) (any, error) {
+	visitRules := debugHandleExpr(func(node *Node, children []any) (any, error) {
 		if err := assertNodeToHaveChildrenCount(node, children, 2); err != nil {
 			return nil, err
 		}
@@ -509,25 +506,25 @@ func createRuleVisitor(
 		return rv, nil
 	})
 
-	mux := NewNodeVisitorMux(defaultVisitor).
-		VisitWithChildren("expression", liftChild).
-		VisitWithChildren("term", liftChild).
-		VisitWithChildren("atom", liftChild).
-		VisitWithChildren("parenthesized", visitParenthesized).
-		VisitWithChildren("quantifier", visitQuantifier).
-		VisitWithChildren("quantified", visitQuantified).
-		VisitWithChildren("lookahead_term", visitLookaheadTerm).
-		VisitWithChildren("not_term", visitNotTerm).
-		VisitWithChildren("rule", visitRule).
-		VisitWithChildren("sequence", visitSequence).
-		VisitWithChildren("ored", visitOred).
-		VisitWithChildren("or_term", visitOrTerm).
-		VisitWithChildren("label", visitLabel).
-		VisitWithChildren("reference", visitReference).
-		VisitWithChildren("regex", visitRegex).
-		VisitWithChildren("spaceless_literal", visitSpacelessLiteral).
-		VisitWithChildren("literal", visitLiteral).
-		VisitWithChildren("rules", visitRules)
+	mux := NewNodeVisitorMux(WithDefaultNodeVisitFunc(defaultVisitorWithDebug)).
+		HandleExpr("expression", liftChild).
+		HandleExpr("term", liftChild).
+		HandleExpr("atom", liftChild).
+		HandleExpr("parenthesized", visitParenthesized).
+		HandleExpr("quantifier", visitQuantifier).
+		HandleExpr("quantified", visitQuantified).
+		HandleExpr("lookahead_term", visitLookaheadTerm).
+		HandleExpr("not_term", visitNotTerm).
+		HandleExpr("rule", visitRule).
+		HandleExpr("sequence", visitSequence).
+		HandleExpr("ored", visitOred).
+		HandleExpr("or_term", visitOrTerm).
+		HandleExpr("label", visitLabel).
+		HandleExpr("reference", visitReference).
+		HandleExpr("regex", visitRegex).
+		HandleExpr("spaceless_literal", visitSpacelessLiteral).
+		HandleExpr("literal", visitLiteral).
+		HandleExpr("rules", visitRules)
 
 	return mux
 }

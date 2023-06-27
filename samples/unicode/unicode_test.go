@@ -47,18 +47,20 @@ func Test_UnicodeGrammar(t *testing.T) {
 	countStatements := 0
 	countDigits := 0
 	mux := parsimonious.NewNodeVisitorMux(
-		parsimonious.VisitWithChildren(func(node *parsimonious.Node, children []interface{}) (interface{}, error) {
-			t.Logf("visiting node with default visitor: %s", node)
+		parsimonious.WithDefaultNodeVisitFunc(
+			func(node *parsimonious.Node, children []any) (any, error) {
+				t.Logf("visiting node with default visitor: %s", node)
 
-			return node.Text, nil
-		}),
+				return node.Text, nil
+			},
+		),
 	).
-		VisitWithChildren("statement", func(node *parsimonious.Node, children []interface{}) (interface{}, error) {
+		HandleExpr("statement", func(node *parsimonious.Node, children []any) (any, error) {
 			countStatements++
 
 			return children, nil
 		}).
-		VisitWithChildren("digits", func(node *parsimonious.Node, children []interface{}) (interface{}, error) {
+		HandleExpr("digits", func(node *parsimonious.Node, children []any) (any, error) {
 			countDigits++
 
 			return children, nil

@@ -121,19 +121,12 @@ var pythonStringExpr, pythonStringVisitor = func() (Expression, *NodeVisitorMux)
 		return children[0], nil
 	}
 
-	mux := NewNodeVisitorMux(
-		VisitWithChildren(func(node *Node, children []any) (any, error) {
-			if len(children) > 0 {
-				return children, nil
-			}
-			return node, nil
-		}),
-	).
-		VisitWithChildren("single_quoted", visitQuoted).
-		VisitWithChildren("double_quoted", visitQuoted).
-		VisitWithChildren("raw_string_double_quoted", visitRawString).
-		VisitWithChildren("raw_string_single_quoted", visitRawString).
-		VisitWithChildren("string_value", visitStringValue)
+	mux := NewNodeVisitorMux().
+		HandleExpr("single_quoted", visitQuoted).
+		HandleExpr("double_quoted", visitQuoted).
+		HandleExpr("raw_string_double_quoted", visitRawString).
+		HandleExpr("raw_string_single_quoted", visitRawString).
+		HandleExpr("string_value", visitStringValue)
 
 	return stringValue, mux
 }()

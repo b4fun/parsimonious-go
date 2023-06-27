@@ -67,27 +67,48 @@ func newRegexNode(
 	return node
 }
 
-type NodeVisitor interface {
-	Visit(node *Node) (any, error)
-}
+// NodeVisitFunc is a function that visits a node and its parsed children in the parse tree.
+type NodeVisitFunc func(node *Node, children []any) (any, error)
 
-type NodeVisitFunc func(v NodeVisitor, node *Node) (any, error)
-
-type NodeVisitWithChildrenFunc func(node *Node, children []any) (any, error)
-
+// NodeVisitorMux is a multiplexer for visiting nodes in the parse tree.
 type NodeVisitorMux struct {
 	visitors     map[string]NodeVisitFunc
 	defaultVisit NodeVisitFunc
 }
 
-func NewNodeVisitorMux(defaultVisit NodeVisitFunc) *NodeVisitorMux {
-	return &NodeVisitorMux{
-		visitors:     make(map[string]NodeVisitFunc),
-		defaultVisit: defaultVisit,
+// NodeVisitorMuxOpt configures a NodeVisitorMux.
+type NodeVisitorMuxOpt func(*NodeVisitorMux)
+
+// WithDefaultNodeVisitFunc sets the default visit function for a NodeVisitorMux.
+func WithDefaultNodeVisitFunc(f NodeVisitFunc) NodeVisitorMuxOpt {
+	return func(mux *NodeVisitorMux) {
+		mux.defaultVisit = f
 	}
 }
 
-func (mux *NodeVisitorMux) VisitWith(
+func DefaultNodeVisitor(node *Node, children []any) (any, error) {
+	if len(children) > 0 {
+		return children, nil
+	}
+
+	return node, nil
+}
+
+// NewNodeVisitorMux creates a NodeVisitorMux instance.
+func NewNodeVisitorMux(opts... NodeVisitorMuxOpt) *NodeVisitorMux {
+	rv := &NodeVisitorMux{
+		visitors:     make(map[string]NodeVisitFunc),
+		defaultVisit: DefaultNodeVisitor,
+	}
+
+	for _, opt := range opts {
+		opt(rv)
+	}
+
+	return rv
+}
+
+func (mux *NodeVisitorMux) HandleExpr(
 	exprName string,
 	f NodeVisitFunc,
 ) *NodeVisitorMux {
@@ -99,37 +120,22 @@ func (mux *NodeVisitorMux) VisitWith(
 	return mux
 }
 
-func VisitWithChildren(f NodeVisitWithChildrenFunc) NodeVisitFunc {
-	return func(v NodeVisitor, node *Node) (any, error) {
-		children := make([]any, 0, len(node.Children))
+func (mux *NodeVisitorMux) Visit(node *Node) (any, error) {
+	visitor, ok := mux.visitors[node.Expression.ExprName()]
+	if !ok {
+		visitor = mux.defaultVisit
+	}
+
+	children := make([]any, 0, len(node.Children))
 		for _, child := range node.Children {
-			c, err := v.Visit(child)
+			c, err := mux.Visit(child)
 			if err != nil {
 				return nil, err
 			}
 			children = append(children, c)
 		}
 
-		return f(node, children)
-	}
-}
-
-func (mux *NodeVisitorMux) VisitWithChildren(
-	exprName string,
-	f NodeVisitWithChildrenFunc,
-) *NodeVisitorMux {
-	return mux.VisitWith(exprName, VisitWithChildren(f))
-}
-
-func (mux *NodeVisitorMux) Visit(
-	node *Node,
-) (any, error) {
-	visitor, ok := mux.visitors[node.Expression.ExprName()]
-	if !ok {
-		visitor = mux.defaultVisit
-	}
-
-	return visitor(mux, node)
+	return visitor(node, children)
 }
 
 func assertNodeToHaveChildrenCount(node *Node, children []any, count int) error {

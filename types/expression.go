@@ -168,7 +168,7 @@ func (opts *ParseOptions) withPos(newPos int) *ParseOptions {
 	}
 }
 
-func (opts *ParseOptions) debugf(format string, args ...interface{}) {
+func (opts *ParseOptions) debugf(format string, args ...interface{}) { //nolint:unused
 	if opts.debug {
 		fmt.Printf(format, args...)
 	}

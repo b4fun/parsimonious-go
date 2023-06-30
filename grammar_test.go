@@ -16,7 +16,8 @@ func Test_Grammar_ParseErrors(t *testing.T) {
 		assert.IsType(t, &ErrIncompleteParseFailed{}, err)
 		assert.Equal(
 			t, err.Error(),
-			`rule "seq" matched in its entirely, but it didn't consume all the text. The non-matching portion of the text begins with "" (line 1, column 4)`,
+			`rule "seq" matched in its entirely, but it didn't consume all the text. `+
+				`The non-matching portion of the text begins with "" (line 1, column 4)`,
 		)
 	})
 }

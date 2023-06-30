@@ -64,7 +64,8 @@ func newErrIncompleteParseFailed(
 func (e *ErrIncompleteParseFailed) Error() string {
 	line, column := e.LineAndColumn()
 	return fmt.Sprintf(
-		"rule %q matched in its entirely, but it didn't consume all the text. The non-matching portion of the text begins with %q (line %d, column %d)",
+		"rule %q matched in its entirely, but it didn't consume all the text. "+
+			"The non-matching portion of the text begins with %q (line %d, column %d)",
 		e.Expression.ExprName(),
 		sliceStringAsRuneSliceWithLength(e.Text, e.Position, 20),
 		line, column,

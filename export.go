@@ -21,6 +21,6 @@ type (
 	Node       = types.Node
 	Expression = types.Expression
 
-	ErrParseFailed		   = types.ErrParseFailed
+	ErrParseFailed           = types.ErrParseFailed
 	ErrIncompleteParseFailed = types.ErrIncompleteParseFailed
 )

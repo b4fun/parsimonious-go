@@ -10,15 +10,15 @@ var (
 )
 
 type ErrParseFailed struct {
-	Text string
-	Position int
+	Text       string
+	Position   int
 	Expression Expression
 }
 
 func newErrParseFailed(text string, position int, expression Expression) *ErrParseFailed {
 	return &ErrParseFailed{
-		Text: text,
-		Position: position,
+		Text:       text,
+		Position:   position,
 		Expression: expression,
 	}
 }

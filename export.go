@@ -20,4 +20,7 @@ var (
 type (
 	Node       = types.Node
 	Expression = types.Expression
+
+	ErrParseFailed		   = types.ErrParseFailed
+	ErrIncompleteParseFailed = types.ErrIncompleteParseFailed
 )

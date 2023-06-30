@@ -1,6 +1,9 @@
 package types
 
-import "fmt"
+import (
+	"fmt"
+	"unicode/utf8"
+)
 
 func sliceStringAsRuneSlice(s string, from, to int) string {
 	switch {
@@ -15,4 +18,14 @@ func sliceStringAsRuneSlice(s string, from, to int) string {
 	default:
 		panic(fmt.Sprintf("invalid sliceStringAsRuneSlice: %d, %d", from, to))
 	}
+}
+
+func sliceStringAsRuneSliceWithLength(s string, from, length int) string {
+	maxLength := utf8.RuneCountInString(s)
+	to := from + length
+	if to >= maxLength {
+		to = maxLength - 1
+	}
+
+	return sliceStringAsRuneSlice(s, from, to)
 }

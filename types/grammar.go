@@ -25,12 +25,7 @@ func (g *Grammar) String() string {
 }
 
 func (g *Grammar) Parse(text string, parseOpts ...ParseOption) (*Node, error) {
-	t, err := g.defaultRule.Match(text, createParseOpts(parseOpts...))
-	if err != nil {
-		return nil, err
-	}
-
-	return t, nil
+	return ParseWithExpression(g.defaultRule, text, parseOpts...)
 }
 
 func (g *Grammar) ParseWithRule(ruleName string, text string, parseOpts ...ParseOption) (*Node, error) {
@@ -38,7 +33,7 @@ func (g *Grammar) ParseWithRule(ruleName string, text string, parseOpts ...Parse
 	if !ok {
 		return nil, fmt.Errorf("no such rule %q", ruleName)
 	}
-	return rule.Match(text, createParseOpts(parseOpts...))
+	return ParseWithExpression(rule, text, parseOpts...)
 }
 
 func (g *Grammar) GetRule(ruleName string) (Expression, bool) {

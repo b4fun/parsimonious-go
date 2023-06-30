@@ -50,11 +50,6 @@ func (c nodeCache) set(expr Expression, pos int, node *Node) {
 	c[exprHash][pos] = node
 }
 
-var (
-	ErrParseFailed        = fmt.Errorf("parse failed")
-	ErrLeftRecursionError = fmt.Errorf("left recursion error") // TODO: add position
-)
-
 type matchResult struct {
 	Node *Node
 	Err  error
@@ -201,10 +196,7 @@ func ParseWithExpression(expr Expression, text string, opts ...ParseOption) (*No
 		return nil, err
 	}
 	if textLen := utf8.RuneCountInString(text); node.End < textLen {
-		return nil, fmt.Errorf(
-			"incomplete input parsed, parsed end=%d, input length=%d",
-			node.End, textLen,
-		)
+		return nil, newErrIncompleteParseFailed(text, node.End, expr)
 	}
 
 	return node, nil
@@ -267,7 +259,7 @@ func (e *expression) Match(text string, parseOpts *ParseOptions) (*Node, error) 
 	case result.isMatchFailed():
 		return nil, result.Err
 	default:
-		return nil, fmt.Errorf("%w: text=%s, pos=%d", ErrParseFailed, text, parseOpts.pos)
+		return nil, newErrParseFailed(text, parseOpts.pos, e)
 	}
 }
 

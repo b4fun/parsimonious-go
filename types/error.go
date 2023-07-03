@@ -5,10 +5,6 @@ import (
 	"strings"
 )
 
-var (
-	ErrLeftRecursionError = fmt.Errorf("left recursion error") // TODO: add position
-)
-
 type ErrParseFailed struct {
 	Text       string
 	Position   int
@@ -66,6 +62,32 @@ func (e *ErrIncompleteParseFailed) Error() string {
 	return fmt.Sprintf(
 		"rule %q matched in its entirely, but it didn't consume all the text. "+
 			"The non-matching portion of the text begins with %q (line %d, column %d)",
+		e.Expression.ExprName(),
+		sliceStringAsRuneSliceWithLength(e.Text, e.Position, 20),
+		line, column,
+	)
+}
+
+type ErrLeftRecursion struct {
+	ErrParseFailed
+}
+
+func newErrLeftRecursion(
+	text string,
+	position int,
+	expression Expression,
+) *ErrLeftRecursion {
+	return &ErrLeftRecursion{
+		ErrParseFailed: *newErrParseFailed(text, position, expression),
+	}
+}
+
+func (e *ErrLeftRecursion) Error() string {
+	line, column := e.LineAndColumn()
+
+	return fmt.Sprintf(
+		"left recursion in rule %q at %q (line %d, column %d). "+
+		"Please rewrite your grammar into a rule that does not use left recursion.",
 		e.Expression.ExprName(),
 		sliceStringAsRuneSliceWithLength(e.Text, e.Position, 20),
 		line, column,

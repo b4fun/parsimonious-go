@@ -23,5 +23,5 @@ type (
 
 	ErrParseFailed           = types.ErrParseFailed
 	ErrIncompleteParseFailed = types.ErrIncompleteParseFailed
-	ErrLeftRecursion		 = types.ErrLeftRecursion
+	ErrLeftRecursion         = types.ErrLeftRecursion
 )

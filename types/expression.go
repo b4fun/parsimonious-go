@@ -13,7 +13,7 @@ import (
 func hash(d []byte) uint64 {
 	// TODO: use murmur3?
 	h := fnv.New64a()
-	h.Sum(d)
+	h.Write(d)
 	return h.Sum64()
 }
 
@@ -44,7 +44,7 @@ func (c nodeCache) set(expr Expression, pos int, node *Node) {
 
 	exprHash := expr.hash()
 	if _, ok := c[exprHash]; !ok {
-		c[exprHash] = make(nodePosCache)
+		c[exprHash] = nodePosCache{}
 	}
 
 	c[exprHash][pos] = node
@@ -251,8 +251,8 @@ func (e *expression) SetExprName(n string) {
 }
 
 func (e *expression) Match(text string, parseOpts *ParseOptions) (*Node, error) {
-	cache := new(nodeCache)
-	result := e.matchWithCache(text, parseOpts, *cache)
+	cache := nodeCache{}
+	result := e.matchWithCache(text, parseOpts, cache)
 	switch {
 	case result.isMatchedNode():
 		return result.Node, nil
@@ -275,7 +275,7 @@ func (e *expression) matchWithCache(text string, parseOpts *ParseOptions, cache 
 		cache.set(e, parseOpts.pos, node)
 	}
 	if node == nodeInProgress {
-		return matchFailed(fmt.Errorf("%w: text=%s, pos=%d", ErrLeftRecursionError, text, parseOpts.pos))
+		return matchFailed(newErrLeftRecursion(text, parseOpts.pos, e))
 	}
 	if node == nil {
 		return noMatch()
@@ -632,7 +632,13 @@ func (q *Quantifier) setExprName(n string) {
 }
 
 func (q *Quantifier) identity() []byte {
-	return []byte("quantifier:" + q.name)
+	// FIXME: use pointer address as identity?
+	b := fmt.Sprintf(
+		"quantifier:%s:%d",
+		q.name, q.member.hash(),
+	)
+
+	return []byte(b)
 }
 
 func (q *Quantifier) uncachedMatch(text string, parseOpts *ParseOptions, cache nodeCache) *matchResult {

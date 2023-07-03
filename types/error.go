@@ -87,7 +87,7 @@ func (e *ErrLeftRecursion) Error() string {
 
 	return fmt.Sprintf(
 		"left recursion in rule %q at %q (line %d, column %d). "+
-		"Please rewrite your grammar into a rule that does not use left recursion.",
+			"Please rewrite your grammar into a rule that does not use left recursion.",
 		e.Expression.ExprName(),
 		sliceStringAsRuneSliceWithLength(e.Text, e.Position, 20),
 		line, column,

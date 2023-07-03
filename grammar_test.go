@@ -1,7 +1,6 @@
 package parsimonious
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,7 +32,6 @@ number_expression = ~"[0-9]+"
 `,
 		)
 		assert.NoError(t, err)
-		fmt.Println("here!!")
 
 		tree, err := grammar.ParseWithRule(
 			"operator_expression",
@@ -45,7 +43,8 @@ number_expression = ~"[0-9]+"
 		assert.IsType(t, &ErrLeftRecursion{}, err)
 		assert.Equal(
 			t, err.Error(),
-			"",
+			`left recursion in rule "operator_expression" at "1+" (line 1, column 1). `+
+				`Please rewrite your grammar into a rule that does not use left recursion.`,
 		)
 	})
 }

@@ -20,6 +20,7 @@ var (
 type (
 	Node       = types.Node
 	Expression = types.Expression
+	Grammar    = types.Grammar
 
 	ErrParseFailed           = types.ErrParseFailed
 	ErrIncompleteParseFailed = types.ErrIncompleteParseFailed

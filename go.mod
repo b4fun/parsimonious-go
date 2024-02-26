@@ -3,7 +3,7 @@ module github.com/b4fun/parsimonious-go
 go 1.20
 
 require (
-	github.com/dlclark/regexp2 v1.10.0
+	github.com/dlclark/regexp2 v1.11.0
 	github.com/stretchr/testify v1.8.4
 )
 
